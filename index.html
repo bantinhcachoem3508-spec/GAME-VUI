@@ -15,11 +15,11 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,Helvetica,sans-serif;background:#57c8ff;color:#fff}
 #game{position:fixed;inset:0}
 .card{background:var(--panel);border:3px solid rgba(255,255,255,.85);border-radius:22px;box-shadow:var(--shadow)}
-#hud{position:fixed;left:16px;top:14px;z-index:20;display:flex;gap:10px}
+#hud{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:20;display:flex;gap:14px;justify-content:center}
 .metric{padding:10px 14px;min-width:110px;text-align:center}
 .metric .v{font-size:34px;font-weight:900;text-shadow:0 3px 0 rgba(0,0,0,.55)}
 .metric .l{font-size:11px;opacity:.85;margin-top:6px;letter-spacing:1.3px;font-weight:700}
-#cameraWrap{position:fixed;right:16px;top:16px;width:220px;height:164px;z-index:24;border-radius:24px;overflow:hidden;background:#07111d;border:4px solid #fff;box-shadow:var(--shadow)}
+#cameraWrap{position:fixed;right:22px;top:22px;width:220px;height:164px;z-index:24;border-radius:24px;overflow:hidden;background:#07111d;border:4px solid #fff;box-shadow:var(--shadow)}
 #video,#poseCanvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
 #poseCanvas{pointer-events:none}
 #status{position:fixed;right:16px;top:192px;width:220px;z-index:24;padding:12px 14px;text-align:center;font-weight:700}
@@ -59,6 +59,44 @@ button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:2
 }
 
 #speedFX{position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(ellipse at center,transparent 35%,rgba(255,255,255,.08));opacity:0;transition:.2s}
+
+/* MARIO KART ARCADE UI */
+#hud .metric{
+ background:linear-gradient(180deg,#ffeb55,#ff9d00);
+ color:#241300;
+ border:4px solid white;
+ box-shadow:0 6px 0 #d65b00,0 15px 30px rgba(0,0,0,.35);
+ transform:skew(-4deg);
+}
+#hud .metric .v{
+ color:#fff;
+ text-shadow:3px 3px 0 #e05b00;
+}
+#mission{
+ animation:pulseMission 1.5s infinite;
+}
+@keyframes pulseMission{
+ 50%{transform:translateX(-50%) scale(1.04)}
+}
+#cameraWrap:after{
+ content:'PLAYER';
+ position:absolute;
+ left:8px;
+ bottom:5px;
+ background:#ffcc00;
+ color:#222;
+ padding:3px 10px;
+ border-radius:10px;
+ font-size:11px;
+ font-weight:900;
+}
+#toast{
+ background:linear-gradient(180deg,#ffe85c,#ff7800);
+ color:#271400;
+ border:4px solid white;
+ box-shadow:0 8px 25px rgba(0,0,0,.35);
+}
+
 </style>
 </head>
 <body>
@@ -565,7 +603,7 @@ function update(dt){
   // Mario Kart style chase camera
   camera.position.x += (car.position.x*.55-camera.position.x)*Math.min(1,dt*7);
   camera.position.y += (5.8-camera.position.y)*Math.min(1,dt*4);
-  camera.position.z += (18.5-camera.position.z)*Math.min(1,dt*4);
+  camera.position.z += (15.5-camera.position.z)*Math.min(1,dt*4);
   camera.lookAt(car.position.x,1,-12);
 
   if(engineGain && engineOsc){
