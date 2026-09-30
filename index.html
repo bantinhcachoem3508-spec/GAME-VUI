@@ -1,793 +1,450 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Mario Kart Motion Racing</title>
-<style>
-:root{
-  --white:#fff;
-  --shadow:0 18px 45px rgba(0,0,0,.35);
-  --panel:linear-gradient(180deg,rgba(14,34,86,.94),rgba(8,15,42,.95));
-  --accent:linear-gradient(180deg,#ffe869,#ff9600);
-}
-*{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,Helvetica,sans-serif;background:#57c8ff;color:#fff}
-#game{position:fixed;inset:0}
-.card{background:var(--panel);border:3px solid rgba(255,255,255,.85);border-radius:22px;box-shadow:var(--shadow)}
-#hud{position:fixed;left:16px;top:14px;z-index:20;display:flex;gap:10px}
-.metric{padding:10px 14px;min-width:110px;text-align:center}
-.metric .v{font-size:34px;font-weight:900;text-shadow:0 3px 0 rgba(0,0,0,.55)}
-.metric .l{font-size:11px;opacity:.85;margin-top:6px;letter-spacing:1.3px;font-weight:700}
-#cameraWrap{position:fixed;right:16px;top:16px;width:220px;height:164px;z-index:24;border-radius:24px;overflow:hidden;background:#07111d;border:4px solid #fff;box-shadow:var(--shadow)}
-#video,#poseCanvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
-#poseCanvas{pointer-events:none}
-#status{position:fixed;right:16px;top:192px;width:220px;z-index:24;padding:12px 14px;text-align:center;font-weight:700}
-#status strong{display:block;font-size:18px;margin-top:4px}
-#leanTrack{height:8px;background:rgba(255,255,255,.15);border-radius:999px;margin-top:10px;overflow:hidden;position:relative}
-#leanDot{position:absolute;top:0;left:50%;width:18px;height:8px;background:#67ffd5;border-radius:999px;transform:translateX(-50%)}
-#mission{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:25;min-width:min(820px,84vw);padding:13px 18px;text-align:center;font-weight:900;font-size:18px;background:linear-gradient(180deg,#ffe05c,#ff8e00);color:#271500;border:4px solid #fff;border-radius:999px;box-shadow:var(--shadow)}
-#toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:40;padding:12px 22px;border-radius:999px;background:rgba(10,19,55,.94);border:2px solid rgba(255,255,255,.82);font-weight:900;opacity:0;transition:.18s;pointer-events:none}
-#toast.show{opacity:1}
-#timebar{position:fixed;left:18px;right:270px;bottom:16px;height:10px;background:rgba(255,255,255,.18);z-index:20;border-radius:999px;overflow:hidden;border:2px solid rgba(255,255,255,.6)}
-#timefill{height:100%;width:100%;background:linear-gradient(90deg,#36f0b7,#3db9ff,#ffd83d)}
-#start,#finish{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;background:
-radial-gradient(circle at 50% 10%,rgba(255,247,141,.52),transparent 22%),
-radial-gradient(circle at 20% 20%,rgba(255,255,255,.14),transparent 18%),
-linear-gradient(180deg,#4fd3ff,#1a56d8)}
-#finish{display:none}
-.panel{width:min(900px,94vw);padding:34px 34px 38px;border-radius:34px;background:rgba(7,20,62,.88);border:4px solid #fff;box-shadow:0 30px 90px rgba(0,0,0,.42);text-align:center}
-h1{margin:0;font-size:56px;letter-spacing:1.5px;text-shadow:0 5px 0 rgba(0,0,0,.65)}
-.tagline{margin-top:10px;opacity:.9;font-size:18px;font-weight:700}
-.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:22px 0 6px;text-align:left}
-.tip{padding:12px 14px;border-radius:16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14)}
-.tip b{display:block;font-size:15px;margin-bottom:5px;color:#ffe971}
-button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:20px;font-weight:900;cursor:pointer;background:var(--accent);color:#2d1800;border:4px solid #fff;box-shadow:0 10px 30px rgba(255,153,0,.35)}
-#finalScore{font-size:84px;font-weight:900;margin:10px 0 0;text-shadow:0 5px 0 rgba(0,0,0,.5)}
-.results{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:24px 0}
-.chip{min-width:140px;padding:12px 16px;border-radius:16px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14)}
-.chip b{display:block;font-size:28px}
-.good{color:#7ff2bd}.bad{color:#ff9c9c}.gold{color:#ffe680}
-@media (max-width:900px){
-  #cameraWrap{width:170px;height:128px}
-  #status{top:150px;width:170px;font-size:13px}
-  #hud{gap:6px}
-  .metric{min-width:90px;padding:8px 10px}
-  .metric .v{font-size:28px}
-  #mission{font-size:15px;bottom:20px}
-  h1{font-size:40px}
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mario Kart Motion Game - 60s Challenge</title>
+    <!-- Thư viện Three.js cho đồ họa 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Thư viện MediaPipe Pose để nhận diện cử động qua Camera -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #111;
+            font-family: 'Arial', sans-serif;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        /* Giao diện UI Tiếng Anh */
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+        }
+        #webcam-video {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 180px;
+            height: 135px;
+            border: 3px solid #ffcc00;
+            border-radius: 10px;
+            transform: scaleX(-1); /* Lật gương camera */
+            object-fit: cover;
+        }
+        #traffic-light-banner {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 55px;
+            font-weight: 900;
+            color: yellow;
+            text-shadow: 3px 3px 6px #000;
+            display: none;
+            pointer-events: none;
+            text-align: center;
+        }
+        #status-box {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ffcc;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        /* Màn hình kết quả khi hết 60 giây */
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            display: none;
+            z-index: 10;
+        }
+        #game-over-screen h1 {
+            font-size: 60px;
+            color: #ffcc00;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 10px rgba(255,204,0,0.5);
+        }
+        #game-over-screen p {
+            font-size: 28px;
+            margin: 10px 0;
+        }
+        #restart-btn {
+            margin-top: 20px;
+            padding: 15px 30px;
+            font-size: 22px;
+            font-weight: bold;
+            background-color: #00ffcc;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #111;
+            box-shadow: 0 4px 10px rgba(0,255,204,0.4);
+            transition: 0.2s;
+        }
+        #restart-btn:hover {
+            background-color: #00cc99;
+            transform: scale(1.05);
+        }
+    </style>
 </head>
 <body>
-<div id="game"></div>
 
-<div id="hud">
-  <div class="card metric"><div id="score" class="v">0</div><div class="l">SCORE</div></div>
-  <div class="card metric"><div id="speed" class="v">0</div><div class="l">KM/H</div></div>
-  <div class="card metric"><div id="timer" class="v">60</div><div class="l">SECONDS</div></div>
-</div>
-
-<div id="cameraWrap">
-  <video id="video" autoplay muted playsinline></video>
-  <canvas id="poseCanvas"></canvas>
-</div>
-
-<div id="status" class="card">
-  BODY CONTROL
-  <strong id="gestureText">WAITING</strong>
-  <div id="leanTrack"><div id="leanDot"></div></div>
-</div>
-
-<div id="mission">Touch hands above head to drive. Lean left/right to change lane.</div>
-<div id="toast"></div>
-<div id="timebar"><div id="timefill"></div></div>
-
-<div id="start">
-  <div class="panel">
-    <h1>MARIO KART MOTION RACING</h1>
-    <div class="tagline">3D Motion-Control Racing • 60-Second Challenge</div>
-    <div class="controls">
-      <div class="tip"><b>START / RUN</b> Chạm 2 tay trên đầu để xe chạy.</div>
-      <div class="tip"><b>TURN</b> Nghiêng người trái hoặc phải để đổi 1 làn.</div>
-      <div class="tip"><b>RED LIGHT</b> Hạ tay xuống để dừng tại đèn đỏ.</div>
-      <div class="tip"><b>GOAL</b> Né vật cản, lấy xu, vượt thử thách trong 60 giây.</div>
+    <div id="ui">
+        SCORE: <span id="score">0</span><br>
+        TIME LEFT: <span id="timer">60</span>s<br>
+        ACTION: <span id="action-text" style="color: #ffcc00;">WAITING FOR PLAYER...</span>
     </div>
-    <button id="startBtn">START RACE</button>
-  </div>
-</div>
 
-<div id="finish">
-  <div class="panel">
-    <div class="tagline">FINAL RESULT</div>
-    <div id="finalScore">0</div>
-    <div style="font-size:18px;font-weight:900">POINTS</div>
-    <div class="results">
-      <div class="chip"><b id="giftCount">0</b>Coins</div>
-      <div class="chip"><b id="avoidCount">0</b>Obstacles Avoided</div>
-      <div class="chip"><b id="lightCount">0</b>Red Lights Stopped</div>
-      <div class="chip"><b id="hitCount">0</b>Mistakes</div>
+    <div id="status-box">CAMERA: INITIALIZING...</div>
+    <div id="traffic-light-banner">RED LIGHT! STOP!</div>
+    
+    <!-- Màn hình tổng kết khi kết thúc 60s -->
+    <div id="game-over-screen">
+        <h1>TIME'S UP! GREAT JOB!</h1>
+        <p>Your Final Score: <span id="final-score" style="color: #00ffcc; font-weight: bold;">0</span></p>
+        <button id="restart-btn" onclick="location.reload()">PLAY AGAIN</button>
     </div>
-    <button onclick="location.reload()">PLAY AGAIN</button>
-  </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<script>
-const GAME_DURATION=60;
-const TRACK_LENGTH=2600;
-const SPAWN_GAP=42;
-const ui={
-  score:document.getElementById('score'),
-  speed:document.getElementById('speed'),
-  timer:document.getElementById('timer'),
-  gesture:document.getElementById('gestureText'),
-  leanDot:document.getElementById('leanDot'),
-  mission:document.getElementById('mission'),
-  toast:document.getElementById('toast'),
-  timefill:document.getElementById('timefill'),
-  start:document.getElementById('start'),
-  finish:document.getElementById('finish'),
-  finalScore:document.getElementById('finalScore'),
-  giftCount:document.getElementById('giftCount'),
-  avoidCount:document.getElementById('avoidCount'),
-  lightCount:document.getElementById('lightCount'),
-  hitCount:document.getElementById('hitCount')
-};
+    <div id="canvas-container"></div>
+    <video id="webcam-video" autoplay playsinline></video>
 
-let scene,camera,renderer,car,clock;
-let worldZ=0,speed=0,targetSpeed=0,running=false,timeLeft=GAME_DURATION;
-let score=0,gifts=0,avoids=0,lights=0,hits=0;
-let entities=[],spawnCursor=-55,patternIndex=0;
-let leanFiltered=0,gestureMode='STOP';
-let laneIndex=1,targetLaneIndex=1,laneCooldown=0,lastLeanDir=0;
+    <script>
+        // --- 1. KHỞI TẠO GAME 3D (THREE.JS) ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Màu trời xanh
+        scene.fog = new THREE.Fog(0x87ceeb, 20, 100);
 
-// ===== GAME AUDIO SYSTEM =====
-let audioCtx=null, engineOsc=null, engineGain=null;
-let bgGain=null;
-function initAudio(){
-  if(audioCtx) return;
-  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 8);
+        camera.lookAt(0, 0, -5);
 
-  bgGain=audioCtx.createGain();
-  bgGain.gain.value=.035;
-  bgGain.connect(audioCtx.destination);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
 
-  // arcade background tone
-  const bg=audioCtx.createOscillator();
-  bg.type='triangle';
-  bg.frequency.value=220;
-  bg.connect(bgGain);
-  bg.start();
+        // Ánh sáng môi trường
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
 
-  engineOsc=audioCtx.createOscillator();
-  engineOsc.type='sawtooth';
-  engineOsc.frequency.value=90;
-  engineGain=audioCtx.createGain();
-  engineGain.gain.value=0;
-  engineOsc.connect(engineGain);
-  engineGain.connect(audioCtx.destination);
-  engineOsc.start();
-}
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
 
-function sound(type){
-  if(!audioCtx) return;
-  const o=audioCtx.createOscillator();
-  const g=audioCtx.createGain();
-  o.connect(g); g.connect(audioCtx.destination);
-  const now=audioCtx.currentTime;
+        // Tạo đường đua 3 làn
+        const roadWidth = 9;
+        const roadLength = 400;
+        const roadGeo = new THREE.PlaneGeometry(roadWidth, roadLength);
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.position.z = -roadLength / 2 + 50;
+        road.receiveShadow = true;
+        scene.add(road);
 
-  if(type==='coin'){
-    o.frequency.setValueAtTime(900,now);
-    o.frequency.exponentialRampToValueAtTime(1500,now+.12);
-    g.gain.setValueAtTime(.15,now);
-  }
-  if(type==='crash'){
-    o.type='square';
-    o.frequency.setValueAtTime(120,now);
-    o.frequency.linearRampToValueAtTime(40,now+.25);
-    g.gain.setValueAtTime(.2,now);
-  }
-  if(type==='red'){
-    o.frequency.setValueAtTime(500,now);
-    g.gain.setValueAtTime(.12,now);
-  }
-  if(type==='ok'){
-    o.frequency.setValueAtTime(700,now);
-    o.frequency.linearRampToValueAtTime(1100,now+.2);
-    g.gain.setValueAtTime(.15,now);
-  }
-  if(type==='drift'){
-    o.frequency.setValueAtTime(250,now);
-    g.gain.setValueAtTime(.06,now);
-  }
+        // Vạch kẻ 3 làn đường
+        for (let i = -roadWidth/6; i <= roadWidth/6; i += roadWidth/3) {
+            if(i === 0) continue;
+            const lineGeo = new THREE.PlaneGeometry(0.2, roadLength);
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const line = new THREE.Mesh(lineGeo, lineMat);
+            line.rotation.x = -Math.PI / 2;
+            line.position.set(i, 0.01, -roadLength / 2 + 50);
+            scene.add(line);
+        }
 
-  g.gain.exponentialRampToValueAtTime(.001,now+.3);
-  o.start(now);
-  o.stop(now+.3);
-}
+        // Tạo xe Kart (Đỏ rực rỡ phong cách Mario Kart)
+        const kartGroup = new THREE.Group();
+        
+        const bodyGeo = new THREE.BoxGeometry(1.2, 0.5, 2);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0000, roughness: 0.3 });
+        const carBody = new THREE.Mesh(bodyGeo, bodyMat);
+        carBody.position.y = 0.4;
+        carBody.castShadow = true;
+        kartGroup.add(carBody);
 
-const lanes=[-4.8,0,4.8];
-const patterns=[
-  {kind:'road',obs:[0],gift:2},
-  {kind:'traffic'},
-  {kind:'road',obs:[2],gift:0},
-  {kind:'slow'},
-  {kind:'road',obs:[1],gift:2},
-  {kind:'road',obs:[0,2],gift:1},
-  {kind:'traffic'},
-  {kind:'road',obs:[1],gift:0},
-  {kind:'slow'},
-  {kind:'road',obs:[0],gift:1},
-  {kind:'traffic'},
-  {kind:'road',obs:[2],gift:1},
-  {kind:'road',obs:[0,1],gift:2},
-  {kind:'slow'},
-  {kind:'traffic'}
-];
+        const headGeo = new THREE.BoxGeometry(1, 0.4, 0.8);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const carHead = new THREE.Mesh(headGeo, headMat);
+        carHead.position.set(0, 0.7, -0.4);
+        kartGroup.add(carHead);
 
-function toast(text,cls=''){
-  ui.toast.className='show '+cls;
-  ui.toast.textContent=text;
-  clearTimeout(toast.t);
-  toast.t=setTimeout(()=>ui.toast.className='',950);
-}
+        const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.3, 16);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        [-0.7, 0.7].forEach(x => {
+            [-0.8, 0.8].forEach(z => {
+                const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(x, 0.3, z);
+                kartGroup.add(wheel);
+            });
+        });
 
-function init3D(){
-  scene=new THREE.Scene();
-  scene.background=new THREE.Color(0x69d0ff);
-  scene.fog=new THREE.Fog(0x95deff,55,250);
+        scene.add(kartGroup);
+        kartGroup.position.set(0, 0, 2);
 
-  camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,700);
-  camera.position.set(0,8.5,16.5);
-
-  renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.setSize(innerWidth,innerHeight);
-  renderer.shadowMap.enabled=true;
-  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-  renderer.toneMapping=THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure=1.15;
-  document.getElementById('game').appendChild(renderer.domElement);
-
-  scene.add(new THREE.HemisphereLight(0xf0fbff,0x448143,2.2));
-  const sun=new THREE.DirectionalLight(0xffffff,2.9);
-  sun.position.set(35,45,20);
-  sun.castShadow=true;
-  sun.shadow.mapSize.set(2048,2048);
-  scene.add(sun);
-
-  createEnvironment();
-  createKart();
-
-  for(let i=0;i<18;i++){
-    spawnPattern(spawnCursor);
-    spawnCursor-=SPAWN_GAP;
-  }
-  clock=new THREE.Clock();
-  addEventListener('resize',resize);
-}
-
-function createEnvironment(){
-  const ground=new THREE.Mesh(
-    new THREE.PlaneGeometry(420,TRACK_LENGTH),
-    new THREE.MeshStandardMaterial({color:0x62b357,roughness:1})
-  );
-  ground.rotation.x=-Math.PI/2;
-  ground.position.z=-TRACK_LENGTH/2+80;
-  ground.receiveShadow=true;
-  scene.add(ground);
-
-  const road=new THREE.Mesh(
-    new THREE.PlaneGeometry(16,TRACK_LENGTH),
-    new THREE.MeshStandardMaterial({color:0x343a45,roughness:.94})
-  );
-  road.rotation.x=-Math.PI/2;
-  road.position.set(0,.03,-TRACK_LENGTH/2+80);
-  road.receiveShadow=true;
-  scene.add(road);
-
-  const shoulderMatA=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.8});
-  const shoulderMatB=new THREE.MeshStandardMaterial({color:0xff3c3c,roughness:.8});
-  for(let z=-TRACK_LENGTH+160;z<120;z+=5.5){
-    for(const side of [-1,1]){
-      const rumble=new THREE.Mesh(new THREE.BoxGeometry(1.1,.16,2.7),(Math.floor(z/5.5)%2===0?shoulderMatA:shoulderMatB));
-      rumble.position.set(side*8.55,.08,z);
-      rumble.receiveShadow=true;
-      scene.add(rumble);
-    }
-  }
-
-  for(let z=-TRACK_LENGTH+160;z<120;z+=8){
-    for(const x of [-2.65,2.65]){
-      const mark=new THREE.Mesh(new THREE.PlaneGeometry(.22,4.3),new THREE.MeshBasicMaterial({color:0xfff7d5}));
-      mark.rotation.x=-Math.PI/2;
-      mark.position.set(x,.05,z);
-      scene.add(mark);
-    }
-  }
-
-  const startLine=new THREE.Group();
-  for(let i=0;i<16;i++){
-    const sq=new THREE.Mesh(new THREE.BoxGeometry(1,.05,1),new THREE.MeshBasicMaterial({color:i%2?0xffffff:0x111111}));
-    sq.position.set(-7.5+(i%8)*2,0.05,-2-Math.floor(i/8));
-    startLine.add(sq);
-  }
-  scene.add(startLine);
-
-  createScenery();
-}
-
-function createScenery(){
-  const standColors=[0xf44336,0xffca28,0x29b6f6,0x66bb6a,0xab47bc];
-  for(let i=0;i<26;i++){
-    const z=-40-i*95;
-    for(const side of [-1,1]){
-      const stand=new THREE.Group();
-      const base=new THREE.Mesh(new THREE.BoxGeometry(12,1.2,14),new THREE.MeshStandardMaterial({color:0x6b7787,roughness:.9}));
-      base.position.y=.6;
-      stand.add(base);
-      for(let r=0;r<4;r++){
-        const row=new THREE.Mesh(new THREE.BoxGeometry(11-r*1.2,.65,3),new THREE.MeshStandardMaterial({color:standColors[(i+r+2)%standColors.length],roughness:.75}));
-        row.position.set(0,1.2+r*.55,-4+r*1.7);
-        stand.add(row);
-      }
-      stand.position.set(side*18.5,0,z);
-      stand.rotation.y=side===1?-0.28:0.28;
-      stand.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
-      scene.add(stand);
-    }
-  }
-
-  for(let i=0;i<36;i++){
-    const z=-25-i*70;
-    for(const side of [-1,1]){
-      const pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.14,6,10),new THREE.MeshStandardMaterial({color:0x4a5667,metalness:.55,roughness:.45}));
-      pole.position.set(side*10.4,3,z);
-      pole.castShadow=true;
-      scene.add(pole);
-      const lamp=new THREE.Mesh(new THREE.SphereGeometry(.28,14,10),new THREE.MeshBasicMaterial({color:0xfff2a2}));
-      lamp.position.set(side*10.4,5.8,z);
-      scene.add(lamp);
-    }
-  }
-
-  for(let i=0;i<32;i++){
-    const z=-18-i*62;
-    for(const side of [-1,1]){
-      const palm=new THREE.Group();
-      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.22,.34,3.5,8),new THREE.MeshStandardMaterial({color:0x8a5d37,roughness:.9}));
-      trunk.position.y=1.75;
-      palm.add(trunk);
-      for(let k=0;k<5;k++){
-        const leaf=new THREE.Mesh(new THREE.BoxGeometry(.18,.07,2.8),new THREE.MeshStandardMaterial({color:0x2daa59,roughness:.9}));
-        leaf.position.y=3.5;
-        leaf.rotation.y=(Math.PI*2/5)*k;
-        leaf.rotation.x=.48;
-        leaf.position.x=Math.sin((Math.PI*2/5)*k)*.75;
-        leaf.position.z=Math.cos((Math.PI*2/5)*k)*.75;
-        palm.add(leaf);
-      }
-      palm.position.set(side*13.5,0,z+(side===1?8:0));
-      palm.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
-      scene.add(palm);
-    }
-  }
-
-  const bColors=[0x7ad6ff,0xffd04d,0xff6e6e,0x5ff3b0,0xc793ff];
-  for(let i=0;i<20;i++){
-    const z=-75-i*110;
-    const arch=new THREE.Group();
-    for(const x of [-9.5,9.5]){
-      const pillar=new THREE.Mesh(new THREE.BoxGeometry(1,8,1),new THREE.MeshStandardMaterial({color:0xf7f7f7,roughness:.5}));
-      pillar.position.set(x,4,0);
-      pillar.castShadow=true;
-      arch.add(pillar);
-    }
-    const beam=new THREE.Mesh(new THREE.BoxGeometry(20.5,1.1,1.2),new THREE.MeshStandardMaterial({color:bColors[i%bColors.length],metalness:.15,roughness:.5}));
-    beam.position.set(0,8,0);
-    beam.castShadow=true;
-    arch.add(beam);
-    arch.position.set(0,0,z);
-    scene.add(arch);
-  }
-
-  // distant skyline
-  const skylineColors=[0xcde6f4,0xffdfc0,0xd6f0dc,0xe4d5ff,0xccdff0];
-  for(const side of [-1,1]){
-    for(let i=0;i<42;i++){
-      const w=4+Math.random()*6,h=10+Math.random()*24,d=6+Math.random()*10;
-      const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:skylineColors[i%skylineColors.length],roughness:.65,metalness:.05}));
-      b.position.set(side*(28+Math.random()*24),h/2,-40-i*52-Math.random()*24);
-      b.castShadow=true;
-      b.receiveShadow=true;
-      scene.add(b);
-      if(i%3===0){
-        const sign=new THREE.Mesh(new THREE.BoxGeometry(.3,3.4,5),new THREE.MeshBasicMaterial({color:i%2?0x64e7ff:0xff72a5}));
-        sign.position.set(b.position.x-side*(w/2+.2),Math.min(8,h-2),b.position.z);
-        scene.add(sign);
-      }
-    }
-  }
-}
-
-function createKart(){
-  car=new THREE.Group();
-  const bodyMat=new THREE.MeshStandardMaterial({color:0xe53935,metalness:.45,roughness:.35});
-  const trimMat=new THREE.MeshStandardMaterial({color:0xffd54f,metalness:.3,roughness:.3});
-  const darkMat=new THREE.MeshStandardMaterial({color:0x11161d,roughness:.8});
-
-  const base=new THREE.Mesh(new THREE.BoxGeometry(2.5,.6,4.7),bodyMat);
-  base.position.y=.7;base.castShadow=true;car.add(base);
-  const sideLeft=new THREE.Mesh(new THREE.BoxGeometry(.35,.55,4.1),trimMat);
-  sideLeft.position.set(-1.18,.78,.1);car.add(sideLeft);
-  const sideRight=sideLeft.clone(); sideRight.position.x=1.18; car.add(sideRight);
-  const nose=new THREE.Mesh(new THREE.BoxGeometry(1.55,.35,1.2),bodyMat);
-  nose.position.set(0,.95,-1.8);car.add(nose);
-  const seat=new THREE.Mesh(new THREE.BoxGeometry(1.2,.7,1.1),darkMat);
-  seat.position.set(0,1.15,.45);car.add(seat);
-  const back=new THREE.Mesh(new THREE.BoxGeometry(1.95,.25,.4),trimMat);
-  back.position.set(0,1.1,2.2);car.add(back);
-  const wing=new THREE.Mesh(new THREE.BoxGeometry(2.6,.14,.45),trimMat);
-  wing.position.set(0,1.35,2.55);car.add(wing);
-  const steering=new THREE.Mesh(new THREE.TorusGeometry(.28,.05,10,20),new THREE.MeshStandardMaterial({color:0x222,roughness:.8}));
-  steering.rotation.x=Math.PI/2;steering.position.set(0,1.18,-.15);car.add(steering);
-
-  const wheelMat=new THREE.MeshStandardMaterial({color:0x141414,roughness:1});
-  for(const sx of [-1,1])for(const sz of [-1.55,1.55]){
-    const w=new THREE.Mesh(new THREE.CylinderGeometry(.48,.48,.42,18),wheelMat);
-    w.rotation.z=Math.PI/2;w.position.set(sx*1.22,.42,sz);w.castShadow=true;car.add(w);
-    const hub=new THREE.Mesh(new THREE.CylinderGeometry(.14,.14,.45,12),trimMat);
-    hub.rotation.z=Math.PI/2;hub.position.set(sx*1.22,.42,sz);car.add(hub);
-  }
-
-  const exhaustMat=new THREE.MeshStandardMaterial({color:0x9aa7b1,metalness:.85,roughness:.25});
-  for(const x of [-.55,.55]){
-    const ex=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,.55,10),exhaustMat);
-    ex.rotation.x=Math.PI/2; ex.position.set(x,.55,2.55); car.add(ex);
-  }
-  car.position.set(0,0,8.5);
-  scene.add(car);
-}
-
-function barrier(lane,z){
-  const g=new THREE.Group();
-  const base=new THREE.Mesh(new THREE.BoxGeometry(2.55,.95,.95),new THREE.MeshStandardMaterial({color:0xff8a30,roughness:.5}));
-  base.position.y=.52;g.add(base);
-  for(let i=-1;i<=1;i++){
-    const stripe=new THREE.Mesh(new THREE.BoxGeometry(.36,.95,1),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.5}));
-    stripe.position.set(i*.72,.52,0);stripe.rotation.z=.5;g.add(stripe);
-  }
-  const beacon=new THREE.Mesh(new THREE.SphereGeometry(.16,12,10),new THREE.MeshBasicMaterial({color:0xff5151}));
-  beacon.position.set(0,1.2,0);g.add(beacon);
-  g.position.set(lanes[lane],0,z);
-  g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
-  scene.add(g);
-  entities.push({mesh:g,type:'obstacle',active:true,checked:false});
-}
-
-function gift(lane,z){
-  const texture=new THREE.TextureLoader().load('item_question_box_transparent.png');
-  const material=new THREE.SpriteMaterial({map:texture,transparent:true});
-  const sprite=new THREE.Sprite(material);
-  sprite.scale.set(2.1,2.1,1);
-  sprite.position.y=1.3;
-  const g=new THREE.Group();
-  g.add(sprite);
-  g.position.set(lanes[lane],0,z);
-  scene.add(g);
-  entities.push({mesh:g,type:'gift',active:true,checked:false,spin:Math.random()*6});
-}
-
-function slowZone(z){
-  const group=new THREE.Group();
-  for(let i=0;i<9;i++){
-    const strip=new THREE.Mesh(new THREE.PlaneGeometry(16,.5),new THREE.MeshBasicMaterial({color:i%2?0xffd95b:0xff8f00}));
-    strip.rotation.x=-Math.PI/2;
-    strip.position.set(0,.055,z-i*.72);
-    group.add(strip);
-  }
-  scene.add(group);
-  entities.push({mesh:{position:{z:z-2.8}},type:'slow',active:true,checked:false});
-}
-
-function trafficLight(z){
-  const group=new THREE.Group();
-  const stopZone=new THREE.Mesh(new THREE.PlaneGeometry(16,2.4),new THREE.MeshBasicMaterial({color:0xffffff}));
-  stopZone.rotation.x=-Math.PI/2; stopZone.position.set(0,.06,0); group.add(stopZone);
-  for(let i=-3;i<=3;i++){
-    const stripe=new THREE.Mesh(new THREE.PlaneGeometry(1.1,3),new THREE.MeshBasicMaterial({color:0xeef5f8}));
-    stripe.rotation.x=-Math.PI/2;
-    stripe.position.set(i*1.8,.055,-3.1);
-    group.add(stripe);
-  }
-  // Traffic light placed on left side of road like real intersection
-  const pillar=new THREE.Mesh(new THREE.BoxGeometry(.6,7.2,.6),new THREE.MeshStandardMaterial({color:0x657182,metalness:.4,roughness:.45}));
-  pillar.position.set(-8.7,3.6,-.2);
-  group.add(pillar);
-  const beam=new THREE.Mesh(new THREE.BoxGeometry(18.2,.7,.9),new THREE.MeshStandardMaterial({color:0xeff4f7,roughness:.35,metalness:.12}));
-  beam.position.set(0,7.1,-.2); group.add(beam);
-  const panel=new THREE.Mesh(new THREE.BoxGeometry(5.8,1.35,.4),new THREE.MeshStandardMaterial({color:0xd62929,emissive:0x360000,emissiveIntensity:.55}));
-  panel.position.set(0,6.1,-.58); group.add(panel);
-  const signalHousing=new THREE.Mesh(new THREE.BoxGeometry(1.1,3.1,.9),new THREE.MeshStandardMaterial({color:0x151b23,metalness:.45,roughness:.5}));
-  signalHousing.position.set(0,5,-.42); group.add(signalHousing);
-  const red=new THREE.Mesh(new THREE.SphereGeometry(.27,16,10),new THREE.MeshBasicMaterial({color:0xff3b30}));
-  red.position.set(0,5.78,-.9); group.add(red);
-  const yellow=new THREE.Mesh(new THREE.SphereGeometry(.27,16,10),new THREE.MeshBasicMaterial({color:0x6c5a20}));
-  yellow.position.set(0,5,-.9); group.add(yellow);
-  const green=new THREE.Mesh(new THREE.SphereGeometry(.27,16,10),new THREE.MeshBasicMaterial({color:0x164b32}));
-  green.position.set(0,4.22,-.9); group.add(green);
-  group.userData={red,yellow,green,panel};
-  group.position.set(0,0,z);
-  group.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
-  scene.add(group);
-  const t={mesh:group,type:'traffic',active:true,checked:false,state:'red',hold:0,penalized:false};
-  setTrafficColor(t,'red');
-  entities.push(t);
-}
-
-function setTrafficColor(t,state){
-  t.state=state;
-  const ud=t.mesh.userData;
-  if(!ud) return;
-  ud.red.material.color.set(state==='red'?0xff3b30:0x4a1717);
-  ud.yellow.material.color.set(state==='yellow'?0xffd447:0x6c5a20);
-  ud.green.material.color.set(state==='green'?0x35e477:0x164b32);
-  ud.panel.material.color.set(state==='red'?0xd62929:0x25a15a);
-  ud.panel.material.emissive.set(state==='red'?0x500000:0x003916);
-}
-
-function spawnPattern(z){
-  const p=patterns[patternIndex++%patterns.length];
-  if(p.kind==='traffic'){trafficLight(z); return;}
-  if(p.kind==='slow'){slowZone(z); return;}
-  (p.obs||[]).forEach(l=>barrier(l,z));
-  if(typeof p.gift==='number') gift(p.gift,z-9);
-}
-
-function update(dt){
-  laneCooldown=Math.max(0,laneCooldown-dt);
-
-  targetSpeed = gestureMode==='RUN' ? 10.5 : 0;
-  speed += (targetSpeed-speed)*Math.min(1,dt*4.3);
-
-  const targetX=lanes[targetLaneIndex];
-  car.position.x += (targetX-car.position.x)*Math.min(1,dt*8.5);
-  car.rotation.z += (((targetX-car.position.x)*.12)-car.rotation.z)*Math.min(1,dt*10);
-  car.rotation.y += ((targetX-car.position.x)*.04-car.rotation.y)*Math.min(1,dt*10);
-
-  worldZ += speed*dt;
-  scene.position.z=worldZ;
-  // Mario Kart style chase camera
-  camera.position.x += (car.position.x*.55-camera.position.x)*Math.min(1,dt*7);
-  camera.position.y += (6.8-camera.position.y)*Math.min(1,dt*4);
-  camera.position.z += (18.5-camera.position.z)*Math.min(1,dt*4);
-  camera.lookAt(car.position.x,1,-12);
-
-  if(engineGain && engineOsc){
-    engineGain.gain.value = speed>1 ? .035 : 0;
-    engineOsc.frequency.value = 80 + speed*12;
-  }
-
-  ui.speed.textContent=Math.round(speed*4.2);
-  ui.score.textContent=Math.max(0,Math.round(score));
-
-  let nearSpecial=false;
-
-  for(const e of entities){
-    if(!e.active) continue;
-    const wz=e.mesh.position.z+worldZ;
-
-    if(e.type==='gift'){
-      e.mesh.rotation.y += dt*5;
-      e.mesh.position.y = .15 + Math.sin(performance.now()/210+e.spin)*.18;
-    }
-
-    if(e.type==='traffic'){
-      if(wz>-14 && wz<28){
-        nearSpecial=true;
-        if(e.state==='red'){
-          ui.mission.textContent='ĐÈN ĐỎ — CHỜ 1-2 GIÂY';
-
-          // Automatic traffic cycle: red only lasts 1.5 seconds
-          e.hold += dt;
-          if(e.hold >= 1.5){
-            setTrafficColor(e,'green');
-            score += 40;
-            toast('GREEN LIGHT - GO','good');
-            ui.mission.textContent='ĐÈN XANH — TĂNG TỐC';
-          }
-
-          if(wz>3 && wz<8.3 && speed<1.1){
-            e.hold+=dt;
-            if(e.hold>=.8){
-              setTrafficColor(e,'green');
-              score+=70; lights++; e.checked=true;
-              sound('ok'); toast('STOP PERFECT +70','good');
-              ui.mission.textContent='ĐÈN XANH — TĂNG TỐC';
+        // Tạo vật phẩm: Thử thách rẽ trái/phải, đồng xu thưởng, và lằn ranh giảm tốc (Slow-down Lines)
+        const obstacles = [];
+        for (let z = -15; z > -350; z -= 14) {
+            const lane = (Math.floor(Math.random() * 3) - 1) * 3; // -3, 0, 3
+            const typeRand = Math.random();
+            
+            let itemGeo, itemMat, typeStr;
+            if (typeRand < 0.45) {
+                // Đồng xu vàng (Phần thưởng)
+                itemGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.2, 16);
+                itemMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8 });
+                typeStr = 'coin';
+            } else if (typeRand < 0.75) {
+                // Chướng ngại vật bắt buộc né (Rẽ trái/phải)
+                itemGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+                itemMat = new THREE.MeshStandardMaterial({ color: 0xff3300 });
+                typeStr = 'obstacle';
+            } else {
+                // Lằn ranh vạch ngang đường (Yêu cầu giơ 2 tay lên đi chậm)
+                itemGeo = new THREE.BoxGeometry(roadWidth, 0.05, 1);
+                itemMat = new THREE.MeshStandardMaterial({ color: 0x00ffff });
+                typeStr = 'slow_zone';
             }
-          }else if(wz>1 && wz<8.3 && speed>1.1){
-            e.hold=Math.max(0,e.hold-dt*.35);
-          }
-          if(wz>10 && !e.penalized && e.state==='red'){
-            score=Math.max(0,score-85); hits++; e.penalized=true; e.checked=true;
-            setTrafficColor(e,'green');
-            sound('red'); toast('VƯỢT ĐÈN ĐỎ -85','bad');
-          }
-        }else{
-          ui.mission.textContent='ĐÈN XANH — TĂNG TỐC';
+            
+            const item = new THREE.Mesh(itemGeo, itemMat);
+            // Nếu là lằn ranh, đặt ở giữa đường ngập 3 làn
+            if (typeStr === 'slow_zone') {
+                item.position.set(0, 0.02, z);
+            } else {
+                item.position.set(lane, 0.5, z);
+            }
+            
+            item.userData = { type: typeStr, collected: false };
+            scene.add(item);
+            obstacles.push(item);
         }
-      }
-      if(wz>24){ e.active=false; }
-      continue;
-    }
 
-    if(e.type==='slow'){
-      if(wz>-4 && wz<19){
-        nearSpecial=true;
-        ui.mission.textContent='GỜ GIẢM TỐC — GIỮ XE CHẬM';
-        if(wz>8 && !e.checked){
-          if(speed<10){score+=35; toast('GOOD CONTROL +35','good');}
-          else{score=Math.max(0,score-22); hits++; toast('TOO FAST -22','bad');}
-          e.checked=true;
+        // --- 2. BIẾN TRẠNG THÁI GAME & ĐIỀU KHIỂN ---
+        let currentLane = 0; // -1: Trái, 0: Giữa, 1: Phải
+        let targetX = 0;
+        let gameSpeed = 0.12; // Tốc độ bình thường vừa phải
+        let score = 0;
+        let currentActionState = "WAITING";
+        let gameRunning = true;
+        let timeLeft = 60;
+
+        // Đếm ngược thời gian 60 giây
+        const timerInterval = setInterval(() => {
+            if (!gameRunning) return;
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if (timeLeft <= 0) {
+                gameRunning = false;
+                clearInterval(timerInterval);
+                document.getElementById('final-score').innerText = score;
+                document.getElementById('game-over-screen').style.display = 'flex';
+            }
+        }, 1000);
+
+        // Cơ chế Đèn giao thông xuất hiện ngẫu nhiên kiểm tra cử động dừng
+        let isRedLight = false;
+        const trafficLightInterval = setInterval(() => {
+            if (!gameRunning) return;
+            isRedLight = true;
+            document.getElementById('traffic-light-banner').style.display = 'block';
+            document.getElementById('traffic-light-banner').innerHTML = "RED LIGHT!<br><span style='font-size:35px; color:white;'>STOP (Hands at shoulders)</span>";
+            document.getElementById('traffic-light-banner').style.color = "red";
+            
+            // Đèn đỏ kéo dài 1.5 giây
+            setTimeout(() => {
+                if (!gameRunning) return;
+                isRedLight = false;
+                document.getElementById('traffic-light-banner').innerHTML = "GREEN LIGHT!<br><span style='font-size:35px; color:white;'>GO!</span>";
+                document.getElementById('traffic-light-banner').style.color = "green";
+                setTimeout(() => {
+                    document.getElementById('traffic-light-banner').style.display = 'none';
+                }, 1000);
+            }, 1500);
+        }, 14000);
+
+
+        // --- 3. NHẬN DIỆN CỬ CHỈ BẰNG MEDIAPIPE POSE ---
+        const videoElement = document.getElementById('webcam-video');
+        const actionTextEl = document.getElementById('action-text');
+        const statusBox = document.getElementById('status-box');
+
+        function onResults(results) {
+            if (!gameRunning) return;
+            if (!results.poseLandmarks) {
+                statusBox.innerText = "CAMERA: NO PERSON FOUND";
+                return;
+            }
+
+            statusBox.innerText = "CAMERA: ACTIVE (READY)";
+            const landmarks = results.poseLandmarks;
+
+            const leftWrist = landmarks[15];
+            const rightWrist = landmarks[16];
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const nose = landmarks[0];
+
+            // 1. Tay chạm nhau trên đầu -> START / ACCELERATE
+            const distanceWrists = Math.hypot(leftWrist.x - rightWrist.x, leftWrist.y - rightWrist.y);
+            const isHandsTogetherOnHead = (leftWrist.y < nose.y && rightWrist.y < nose.y && distanceWrists < 0.18);
+
+            // 2. Giơ thẳng 2 tay lên đầu song song -> SLOW DOWN (Qua lằn ranh)
+            const isHandsUpParallel = (leftWrist.y < leftShoulder.y && rightWrist.y < rightShoulder.y && Math.abs(leftWrist.x - leftShoulder.x) < 0.18);
+
+            // 3. Tay để ngang vai -> STOP
+            const isHandsAtShoulders = (Math.abs(leftWrist.y - leftShoulder.y) < 0.15 && Math.abs(rightWrist.y - rightShoulder.y) < 0.15);
+
+            // 4. Nghiêng người sang trái / phải
+            const shoulderMidX = (leftShoulder.x + rightShoulder.x) / 2;
+            const tiltOffset = nose.x - shoulderMidX;
+
+            // Xử lý logic gán hành động
+            if (isHandsAtShoulders) {
+                currentActionState = "STOP (Hands at shoulders)";
+                gameSpeed = 0;
+            } else if (isHandsUpParallel) {
+                currentActionState = "SLOW DOWN (Hands up)";
+                gameSpeed = 0.05; // Đi chậm
+            } else if (isHandsTogetherOnHead) {
+                currentActionState = "DRIVING (Normal Speed)";
+                gameSpeed = 0.13; // Tốc độ bình thường
+                
+                // Nghiêng người đổi làn
+                if (tiltOffset > 0.07) {
+                    currentLane = -1; // Làn trái (Do gương camera)
+                    currentActionState += " -> LANE LEFT";
+                } else if (tiltOffset < -0.07) {
+                    currentLane = 1; // Làn phải
+                    currentActionState += " -> LANE RIGHT";
+                } else {
+                    currentLane = 0; // Làn giữa
+                }
+            } else {
+                currentActionState = "IDLE (Show gestures)";
+                gameSpeed = 0;
+            }
+
+            // Kiểm tra luật chơi Đèn Đỏ (Phải dừng hẳn - Hands at shoulders)
+            if (isRedLight) {
+                if (gameSpeed > 0.02) {
+                    score -= 3; // Trừ điểm nếu không chịu dừng lúc đèn đỏ
+                } else {
+                    score += 1; // Thưởng điểm đứng nghiêm đúng luật
+                }
+            }
+
+            actionTextEl.innerText = currentActionState;
+            targetX = currentLane * 3; // Mỗi làn cách nhau 3 đơn vị
         }
-      }
-      if(wz>18) e.active=false;
-      continue;
-    }
 
-    if(wz>4.6 && wz<11.8){
-      const dx=Math.abs(car.position.x-e.mesh.position.x);
-      if(e.type==='obstacle' && !e.checked){
-        if(dx<1.7){
-          score=Math.max(0,score-35); hits++; e.active=false; e.mesh.visible=false;
-          sound('crash'); toast('COLLISION -35','bad');
-        }else if(wz>10.1){
-          score+=20; avoids++; e.checked=true; toast('AVOIDED +20','good');
+        const pose = new Pose({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        });
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+        pose.onResults(onResults);
+
+        const cameraUtils = new Camera(videoElement, {
+            onFrame: async () => {
+                await pose.send({ image: videoElement });
+            },
+            width: 320,
+            height: 240
+        });
+        cameraUtils.start();
+
+        // --- 4. Vòng lặp Render & Xử lý va chạm game ---
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!gameRunning) return;
+
+            // Di chuyển xe mượt mà sang làn mục tiêu
+            kartGroup.position.x += (targetX - kartGroup.position.x) * 0.1;
+
+            // Cho đường chạy lại tạo cảm giác tiến về phía trước
+            obstacles.forEach(item => {
+                item.position.z += gameSpeed;
+                
+                // Xoay đồng hồ/vật phẩm
+                if(item.userData.type === 'coin') {
+                    item.rotation.y += 0.05;
+                }
+
+                // Kiểm tra va chạm với xe Kart
+                const distance = kartGroup.position.distanceTo(item.position);
+                if (distance < 1.3 && !item.userData.collected) {
+                    if (item.userData.type === 'coin') {
+                        item.userData.collected = true;
+                        scene.remove(item);
+                        score += 10; // Ăn xu thưởng
+                    } else if (item.userData.type === 'obstacle') {
+                        item.userData.collected = true;
+                        scene.remove(item);
+                        score -= 5;  // Trúng chướng ngại vật (phải né sang làn khác)
+                    } else if (item.userData.type === 'slow_zone') {
+                        // Đi qua lằn ranh: nếu học sinh đi chậm (giơ tay song song) sẽ được thưởng điểm
+                        item.userData.collected = true;
+                        if (gameSpeed <= 0.06) {
+                            score += 15; // Thưởng lớn vì tuân thủ qua lằn ranh chậm
+                        } else {
+                            score -= 2;  // Phạt vì phóng nhanh qua lằn ranh
+                        }
+                    }
+                }
+
+                // Reset vật phẩm khi chạy qua màn hình
+                if (item.position.z > 5) {
+                    item.position.z = -350;
+                    item.userData.collected = false;
+                    scene.add(item);
+                }
+            });
+
+            document.getElementById('score').innerText = score;
+            renderer.render(scene, camera);
         }
-      }
-      if(e.type==='gift' && dx<1.65){
-        score+=40; gifts++; e.active=false; e.mesh.visible=false; sound('coin'); toast('COIN +40','gold');
-      }
-    }
-    if(wz>24){ e.active=false; if(e.mesh.visible!==undefined) e.mesh.visible=false; }
-  }
 
-  if(!nearSpecial){
-    ui.mission.textContent='Chạm 2 tay trên đầu để chạy chậm • Nghiêng người để đổi làn';
-  }
+        animate();
 
-  if(spawnCursor+worldZ>-720){
-    spawnPattern(spawnCursor);
-    spawnCursor-=SPAWN_GAP;
-  }
-}
-
-function loop(){
-  requestAnimationFrame(loop);
-  const dt=Math.min(clock?clock.getDelta():.016,.05);
-  if(running){
-    timeLeft-=dt;
-    if(timeLeft<=0){timeLeft=0; endGame();}
-    update(dt);
-    ui.timer.textContent=Math.ceil(timeLeft);
-    ui.timefill.style.width=(timeLeft/GAME_DURATION*100)+'%';
-  }
-  renderer.render(scene,camera);
-}
-
-function endGame(){
-  running=false; targetSpeed=0; speed=0;
-  ui.finalScore.textContent=Math.max(0,Math.round(score));
-  ui.giftCount.textContent=gifts;
-  ui.avoidCount.textContent=avoids;
-  ui.lightCount.textContent=lights;
-  ui.hitCount.textContent=hits;
-  ui.finish.style.display='flex';
-}
-
-function resize(){
-  camera.aspect=innerWidth/innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
-}
-
-function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
-function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
-
-function shiftLane(dir){
-  if(laneCooldown>0) return;
-  const next=clamp(targetLaneIndex+dir,0,2);
-  if(next!==targetLaneIndex){
-    targetLaneIndex=next;
-    sound('drift');
-    laneCooldown=.28;
-  }
-}
-
-function detectGesture(lm){
-  if(!lm) return;
-  const nose=lm[0], ls=lm[11], rs=lm[12], lw=lm[15], rw=lm[16], lh=lm[23], rh=lm[24];
-  const shoulderW=Math.max(.08,dist(ls,rs));
-  const handsTouch=dist(lw,rw)<shoulderW*.88;
-  const aboveHead=lw.y<nose.y+.075 && rw.y<nose.y+.075;
-  const rawLean=((nose.x-((lh.x+rh.x)/2))*.72 + (((ls.x+rs.x)/2)-((lh.x+rh.x)/2))*.28)/shoulderW;
-  leanFiltered=leanFiltered*.18 + rawLean*.82;
-
-  const runningPose=aboveHead && handsTouch;
-  gestureMode=runningPose ? 'RUN' : 'STOP';
-  ui.gesture.textContent=runningPose ? 'GO' : 'STOP';
-
-  let steerLevel=clamp(-leanFiltered*10,-1,1);
-  if(Math.abs(steerLevel)<.06) steerLevel=0;
-  ui.leanDot.style.left=(50+steerLevel*45)+'%';
-
-  const leanDir = steerLevel < -.34 ? -1 : (steerLevel > .34 ? 1 : 0);
-  if(runningPose && leanDir!==0 && leanDir!==lastLeanDir){
-    shiftLane(leanDir);
-  }
-  if(leanDir===0) lastLeanDir=0; else lastLeanDir=leanDir;
-}
-
-async function startPose(){
-  const video=document.getElementById('video');
-  const canvas=document.getElementById('poseCanvas');
-  const ctx=canvas.getContext('2d');
-  try{
-    const pose=new Pose({locateFile:file=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
-    pose.setOptions({
-      modelComplexity:1,
-      smoothLandmarks:true,
-      enableSegmentation:false,
-      minDetectionConfidence:.45,
-      minTrackingConfidence:.45
-    });
-    pose.onResults(res=>{
-      canvas.width=video.videoWidth||640;
-      canvas.height=video.videoHeight||480;
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      if(res.poseLandmarks){
-        detectGesture(res.poseLandmarks);
-        const p=res.poseLandmarks;
-        const pairs=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
-        ctx.strokeStyle='#4ff4c2';ctx.fillStyle='#fff';ctx.lineWidth=4;
-        for(const [a,b] of pairs){
-          ctx.beginPath();
-          ctx.moveTo(p[a].x*canvas.width,p[a].y*canvas.height);
-          ctx.lineTo(p[b].x*canvas.width,p[b].y*canvas.height);
-          ctx.stroke();
-        }
-        for(const i of [0,11,12,13,14,15,16,23,24,25,26,27,28]){
-          ctx.beginPath();
-          ctx.arc(p[i].x*canvas.width,p[i].y*canvas.height,5,0,Math.PI*2);
-          ctx.fill();
-        }
-      }
-    });
-    const cam=new Camera(video,{onFrame:async()=>pose.send({image:video}),width:640,height:480});
-    await cam.start();
-    toast('CAMERA READY','good');
-  }catch(err){
-    console.warn(err);
-    toast('CAMERA NOT AVAILABLE','bad');
-  }
-}
-
-document.getElementById('startBtn').onclick=async()=>{
-  ui.start.style.display='none';
-  initAudio();
-  running=true;
-  timeLeft=GAME_DURATION;
-  score=0;gifts=0;avoids=0;lights=0;hits=0;
-  worldZ=0; speed=0; targetSpeed=0; laneIndex=1; targetLaneIndex=1; car.position.x=0;
-  clock.start();
-  await startPose();
-};
-
-init3D();
-loop();
-</script>
+        // Tự động căn chỉnh khi đổi kích thước màn hình
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
 </body>
 </html>
