@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Smart City Motion Drive</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#07111f;font-family:Arial,Helvetica,sans-serif;color:#fff}
+  #game{position:fixed;inset:0}
+  #hud{position:fixed;left:18px;top:16px;z-index:20;display:flex;gap:10px;flex-wrap:wrap}
+  .card{background:rgba(8,19,35,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:10px 14px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+  .big{font-size:22px;font-weight:700}
+  .small{font-size:12px;opacity:.82;margin-top:2px}
+  #cameraWrap{position:fixed;right:18px;top:18px;width:250px;height:188px;border-radius:16px;overflow:hidden;z-index:20;background:#0d1828;border:2px solid rgba(255,255,255,.15);box-shadow:0 12px 35px rgba(0,0,0,.35)}
+  #video,#poseCanvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+  #poseCanvas{pointer-events:none}
+  #gesture{position:fixed;right:18px;top:218px;z-index:20;width:250px;text-align:center}
+  #notice{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:25;background:rgba(6,15,29,.85);padding:10px 18px;border-radius:999px;font-weight:700;border:1px solid rgba(255,255,255,.14)}
+  #startOverlay{position:fixed;inset:0;z-index:50;background:
+      radial-gradient(circle at 50% 30%,rgba(30,120,255,.2),transparent 35%),
+      linear-gradient(180deg,#07111f,#0b1830 58%,#0a1323);
+      display:flex;align-items:center;justify-content:center}
+  #panel{width:min(760px,92vw);text-align:center;padding:34px;border-radius:24px;background:rgba(8,18,34,.74);border:1px solid rgba(255,255,255,.14);box-shadow:0 30px 80px rgba(0,0,0,.45)}
+  h1{font-size:42px;margin:0 0 8px}
+  .subtitle{opacity:.8;margin-bottom:24px}
+  .gestures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;text-align:left;margin:18px 0 24px}
+  .g{background:rgba(255,255,255,.06);padding:12px 14px;border-radius:14px}
+  button{border:0;border-radius:14px;padding:14px 24px;font-size:18px;font-weight:700;cursor:pointer;background:#31d0aa;color:#062016;box-shadow:0 10px 30px rgba(49,208,170,.25)}
+  #fallback{margin-top:14px;font-size:13px;opacity:.72}
+  #challenge{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:20;min-width:300px;text-align:center;font-weight:700}
+  .ok{color:#76f3b9}.warn{color:#ffd06b}.bad{color:#ff8181}
+</style>
+</head>
+<body>
+<div id="game"></div>
+
+<div id="hud">
+  <div class="card"><div class="big" id="score">0</div><div class="small">ĐIỂM</div></div>
+  <div class="card"><div class="big" id="speed">0</div><div class="small">TỐC ĐỘ</div></div>
+  <div class="card"><div class="big" id="stage">1</div><div class="small">THỬ THÁCH</div></div>
+</div>
+
+<div id="notice">Đang chờ bắt đầu</div>
+
+<div id="cameraWrap">
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="poseCanvas"></canvas>
+</div>
+<div id="gesture" class="card">Cử động: <b id="gestureText">Chưa nhận diện</b></div>
+<div id="challenge" class="card">Hãy lái xe qua thành phố thông minh</div>
+
+<div id="startOverlay">
+  <div id="panel">
+    <h1>THÀNH PHỐ THÔNG MINH 3D</h1>
+    <div class="subtitle">Điều khiển ô tô bằng cử động cơ thể</div>
+    <div class="gestures">
+      <div class="g">🙆 <b>Hai tay chạm nhau trên đầu</b><br>Xe chạy</div>
+      <div class="g">↙️↘️ <b>Giữ tay trên đầu + nghiêng người</b><br>Rẽ trái / phải</div>
+      <div class="g">🙌 <b>Hai tay duỗi thẳng lên</b><br>Giảm tốc</div>
+      <div class="g">🧍 <b>Hai tay ngang vai</b><br>Dừng xe</div>
+    </div>
+    <button id="startBtn">BẮT ĐẦU</button>
+    <div id="fallback">Nếu camera chưa dùng được: ↑ chạy · ← → rẽ · ↓ giảm tốc · Space dừng</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script>
+const ui = {
+  score: document.getElementById('score'),
+  speed: document.getElementById('speed'),
+  stage: document.getElementById('stage'),
+  notice: document.getElementById('notice'),
+  challenge: document.getElementById('challenge'),
+  gesture: document.getElementById('gestureText'),
+  overlay: document.getElementById('startOverlay'),
+  startBtn: document.getElementById('startBtn')
+};
+
+let scene,camera,renderer,car,road,clock;
+let speed=0, targetSpeed=0, steer=0, score=0, stage=1;
+let laneX=0, carZ=8, worldZ=0;
+let obstacles=[], rings=[], lamps=[], buildings=[];
+let keys={};
+let gestureState='STOP';
+let running=false;
+let lastObstacleZ=-40;
+let challengeIndex=0;
+const challenges = [
+  {type:'swerve', text:'VẬT CẢN PHÍA TRƯỚC – HÃY RẼ TRÁNH'},
+  {type:'slow', text:'KHU DÂN CƯ – GIẢM TỐC'},
+  {type:'stop', text:'VẠCH DỪNG THÔNG MINH – DỪNG XE'},
+  {type:'swerve', text:'CÔNG TRÌNH ĐƯỜNG BỘ – ĐỔI LÀN'},
+  {type:'slow', text:'KHU VỰC TRƯỜNG HỌC – GIẢM TỐC'},
+];
+
+function init3D(){
+  scene=new THREE.Scene();
+  scene.fog=new THREE.Fog(0x9fc5e8,45,190);
+  scene.background=new THREE.Color(0x8cc4ee);
+
+  camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,500);
+  camera.position.set(0,7.4,13.5);
+
+  renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  document.getElementById('game').appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xdff2ff,0x47652d,1.8));
+  const sun=new THREE.DirectionalLight(0xffffff,2.2);
+  sun.position.set(25,40,20); sun.castShadow=true;
+  sun.shadow.mapSize.set(2048,2048);
+  scene.add(sun);
+
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(260,420),new THREE.MeshStandardMaterial({color:0x77a65c,roughness:1}));
+  ground.rotation.x=-Math.PI/2; ground.position.z=-120; ground.receiveShadow=true; scene.add(ground);
+
+  road=new THREE.Mesh(new THREE.PlaneGeometry(14,420),new THREE.MeshStandardMaterial({color:0x252b32,roughness:.95}));
+  road.rotation.x=-Math.PI/2; road.position.set(0,.02,-120); road.receiveShadow=true; scene.add(road);
+
+  for(let z=-300; z<100; z+=8){
+    const line=new THREE.Mesh(new THREE.PlaneGeometry(.18,4),new THREE.MeshBasicMaterial({color:0xf8f3d5}));
+    line.rotation.x=-Math.PI/2; line.position.set(-2.33,.035,z); scene.add(line);
+    const line2=line.clone(); line2.position.x=2.33; scene.add(line2);
+  }
+  const edgeMat=new THREE.MeshBasicMaterial({color:0xffffff});
+  [-6.7,6.7].forEach(x=>{
+    const e=new THREE.Mesh(new THREE.PlaneGeometry(.18,420),edgeMat);
+    e.rotation.x=-Math.PI/2; e.position.set(x,.04,-120); scene.add(e);
+  });
+
+  createCity();
+  createCar();
+  spawnChallenge(-35,true);
+  clock=new THREE.Clock();
+  window.addEventListener('resize',onResize);
+}
+
+function createCity(){
+  const colors=[0xd7e6f5,0xc7d7e6,0xf0d7bd,0xc8e3d1,0xd7c9e8,0xced6db];
+  for(let side of [-1,1]){
+    for(let i=0;i<24;i++){
+      const w=5+Math.random()*5, h=5+Math.random()*18, d=5+Math.random()*7;
+      const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:colors[i%colors.length],roughness:.72,metalness:.06}));
+      b.position.set(side*(11+Math.random()*12),h/2,-i*16-10-Math.random()*6);
+      b.castShadow=true; b.receiveShadow=true; scene.add(b); buildings.push(b);
+      for(let fy=1.5; fy<h-1; fy+=2.2){
+        for(let fx=-w/2+.9; fx<w/2-.5; fx+=1.5){
+          const win=new THREE.Mesh(new THREE.PlaneGeometry(.55,.75),new THREE.MeshBasicMaterial({color:Math.random()>.35?0xbde7ff:0x6b8394}));
+          win.position.set(b.position.x - side*(w/2+.01), fy, b.position.z);
+          win.rotation.y=side>0?-Math.PI/2:Math.PI/2;
+          scene.add(win);
+        }
+      }
+    }
+  }
+  for(let i=0;i<34;i++){
+    const z=-i*11;
+    [-8.2,8.2].forEach(x=>{
+      const pole=new THREE.Mesh(new THREE.CylinderGeometry(.07,.09,3.7,10),new THREE.MeshStandardMaterial({color:0x3c4650,metalness:.7}));
+      pole.position.set(x,1.85,z); scene.add(pole);
+      const lamp=new THREE.Mesh(new THREE.SphereGeometry(.18,12,8),new THREE.MeshBasicMaterial({color:0xffe89a}));
+      lamp.position.set(x,3.65,z); scene.add(lamp); lamps.push(lamp);
+      const tree=new THREE.Group();
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.18,.22,1.6,8),new THREE.MeshStandardMaterial({color:0x815632}));
+      const crown=new THREE.Mesh(new THREE.SphereGeometry(1.05,14,10),new THREE.MeshStandardMaterial({color:0x3e8b4f}));
+      trunk.position.y=.8; crown.position.y=2.1; tree.add(trunk,crown); tree.position.set(x+(x<0?-2:2),0,z-4); scene.add(tree);
+    });
+  }
+}
+
+function createCar(){
+  car=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.BoxGeometry(2.2,.72,4),new THREE.MeshStandardMaterial({color:0x18b7c9,metalness:.35,roughness:.35}));
+  body.position.y=.75; body.castShadow=true; car.add(body);
+  const cabin=new THREE.Mesh(new THREE.BoxGeometry(1.65,.72,1.9),new THREE.MeshStandardMaterial({color:0xc7efff,metalness:.1,roughness:.18}));
+  cabin.position.set(0,1.36,.15); cabin.castShadow=true; car.add(cabin);
+  const bumper=new THREE.Mesh(new THREE.BoxGeometry(2.25,.22,.25),new THREE.MeshStandardMaterial({color:0x152431,metalness:.65}));
+  bumper.position.set(0,.55,-2.08); car.add(bumper);
+  const wheelMat=new THREE.MeshStandardMaterial({color:0x111111,roughness:1});
+  for(let sx of [-1,1]) for(let sz of [-1.25,1.25]){
+    const wh=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.32,16),wheelMat);
+    wh.rotation.z=Math.PI/2; wh.position.set(sx*1.05,.48,sz); car.add(wh);
+  }
+  car.position.set(0,0,8); scene.add(car);
+}
+
+function makeBarrier(x,z){
+  const g=new THREE.Group();
+  const box=new THREE.Mesh(new THREE.BoxGeometry(2.2,.9,.8),new THREE.MeshStandardMaterial({color:0xffb13b}));
+  box.position.y=.5; box.castShadow=true; g.add(box);
+  for(let i=-1;i<=1;i++){
+    const stripe=new THREE.Mesh(new THREE.BoxGeometry(.35,.94,.82),new THREE.MeshStandardMaterial({color:0x222222}));
+    stripe.rotation.z=.45; stripe.position.set(i*.68,.5,0); g.add(stripe);
+  }
+  g.position.set(x,0,z); scene.add(g); obstacles.push({mesh:g,type:'barrier',passed:false});
+}
+
+function makeStopZone(z){
+  const strip=new THREE.Mesh(new THREE.PlaneGeometry(13,1.25),new THREE.MeshBasicMaterial({color:0xffffff}));
+  strip.rotation.x=-Math.PI/2; strip.position.set(0,.055,z); scene.add(strip);
+  obstacles.push({mesh:strip,type:'stop',passed:false});
+}
+function makeSlowZone(z){
+  for(let i=0;i<7;i++){
+    const strip=new THREE.Mesh(new THREE.PlaneGeometry(13,.35),new THREE.MeshBasicMaterial({color:0xffd65c}));
+    strip.rotation.x=-Math.PI/2; strip.position.set(0,.055,z-i*.8); scene.add(strip);
+  }
+  obstacles.push({mesh:{position:{z:z-2.4}},type:'slow',passed:false});
+}
+
+function spawnChallenge(z,first=false){
+  const c=challenges[challengeIndex%challenges.length];
+  ui.challenge.textContent=c.text;
+  ui.stage.textContent=String(stage);
+  if(c.type==='swerve'){
+    const lane=[-4.5,0,4.5][Math.floor(Math.random()*3)];
+    makeBarrier(lane,z);
+  }else if(c.type==='slow') makeSlowZone(z);
+  else makeStopZone(z);
+  challengeIndex++; if(!first) stage++;
+}
+
+function updateDriving(dt){
+  if(keys.ArrowUp) targetSpeed=18;
+  if(keys.ArrowDown) targetSpeed=5;
+  if(keys.Space) targetSpeed=0;
+  if(keys.ArrowLeft) steer=-1;
+  else if(keys.ArrowRight) steer=1;
+  else steer*=.82;
+
+  if(!keys.ArrowUp && !keys.ArrowDown && !keys.Space){
+    if(gestureState==='RUN') targetSpeed=18;
+    if(gestureState==='LEFT'){targetSpeed=16; steer=-1;}
+    if(gestureState==='RIGHT'){targetSpeed=16; steer=1;}
+    if(gestureState==='SLOW') targetSpeed=6;
+    if(gestureState==='STOP') targetSpeed=0;
+  }
+
+  speed += (targetSpeed-speed)*Math.min(1,dt*2.6);
+  car.position.x += steer*dt*5.5;
+  car.position.x=Math.max(-5.1,Math.min(5.1,car.position.x));
+  car.rotation.z += ((-steer*.12)-car.rotation.z)*Math.min(1,dt*7);
+  worldZ += speed*dt;
+  scene.position.z = worldZ;
+  camera.position.x += ((car.position.x*.36)-camera.position.x)*Math.min(1,dt*3);
+  camera.lookAt(car.position.x*.12,1,-7);
+
+  ui.speed.textContent=Math.round(speed*6);
+  ui.score.textContent=Math.max(0,Math.round(score));
+
+  checkChallenges();
+}
+
+function checkChallenges(){
+  for(const o of obstacles){
+    const z=o.mesh.position.z + worldZ;
+    if(o.passed) continue;
+    if(z>4 && z<11){
+      if(o.type==='barrier'){
+        const dx=Math.abs(car.position.x-o.mesh.position.x);
+        if(dx<1.7){ score=Math.max(0,score-40); ui.notice.innerHTML='<span class="bad">Va chạm! Hãy rẽ tránh vật cản.</span>'; o.passed=true; }
+        else if(z>8){ score+=100; ui.notice.innerHTML='<span class="ok">Vượt vật cản thành công!</span>'; o.passed=true; spawnChallenge(o.mesh.position.z-42); }
+      }
+      if(o.type==='slow' && z>7){
+        if(speed<9){score+=100; ui.notice.innerHTML='<span class="ok">Giảm tốc đúng lúc!</span>';}
+        else {score=Math.max(0,score-30); ui.notice.innerHTML='<span class="warn">Bạn đi quá nhanh qua khu vực cần giảm tốc.</span>';}
+        o.passed=true; spawnChallenge(o.mesh.position.z-42);
+      }
+      if(o.type==='stop' && z>7){
+        if(speed<1.2){score+=120; ui.notice.innerHTML='<span class="ok">Dừng xe chính xác!</span>';}
+        else {score=Math.max(0,score-35); ui.notice.innerHTML='<span class="bad">Chưa dừng xe tại vạch.</span>';}
+        o.passed=true; spawnChallenge(o.mesh.position.z-42);
+      }
+    }
+  }
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  if(running){
+    const dt=Math.min(clock.getDelta(),.05);
+    updateDriving(dt);
+  }
+  renderer.render(scene,camera);
+}
+
+function onResize(){
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight);
+}
+
+window.addEventListener('keydown',e=>{keys[e.code]=true;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault()});
+window.addEventListener('keyup',e=>{keys[e.code]=false});
+
+function d(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+function setGesture(g,label){
+  gestureState=g; ui.gesture.textContent=label;
+}
+function detectGesture(lm){
+  if(!lm) return;
+  const nose=lm[0], ls=lm[11], rs=lm[12], le=lm[13], re=lm[14], lw=lm[15], rw=lm[16], lh=lm[23], rh=lm[24];
+  const shoulderW=d(ls,rs);
+  const handsTouch=d(lw,rw) < shoulderW*.48;
+  const bothAboveHead=lw.y<nose.y && rw.y<nose.y;
+  const armsHigh=lw.y<ls.y-.16 && rw.y<rs.y-.16;
+  const armsHorizontal=Math.abs(lw.y-ls.y)<.10 && Math.abs(rw.y-rs.y)<.10 && Math.abs(lw.x-ls.x)>.18 && Math.abs(rw.x-rs.x)>.18;
+  const torsoCenterX=(ls.x+rs.x+lh.x+rh.x)/4;
+  const shoulderCenterX=(ls.x+rs.x)/2;
+  const lean=shoulderCenterX-torsoCenterX;
+
+  if(armsHorizontal){setGesture('STOP','DỪNG XE');return;}
+  if(armsHigh && !handsTouch){setGesture('SLOW','GIẢM TỐC');return;}
+  if(bothAboveHead && handsTouch){
+    if(lean>0.035){setGesture('LEFT','RẼ TRÁI');return;}
+    if(lean<-0.035){setGesture('RIGHT','RẼ PHẢI');return;}
+    setGesture('RUN','XE CHẠY');return;
+  }
+}
+
+async function startPose(){
+  const video=document.getElementById('video');
+  const canvas=document.getElementById('poseCanvas');
+  const ctx=canvas.getContext('2d');
+  try{
+    const pose=new Pose({locateFile:(file)=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+    pose.setOptions({modelComplexity:1,smoothLandmarks:true,enableSegmentation:false,minDetectionConfidence:.55,minTrackingConfidence:.55});
+    pose.onResults(res=>{
+      canvas.width=video.videoWidth||640; canvas.height=video.videoHeight||480;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      if(res.poseLandmarks){
+        detectGesture(res.poseLandmarks);
+        const pts=res.poseLandmarks;
+        const pairs=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+        ctx.lineWidth=4; ctx.strokeStyle='#39f3b2'; ctx.fillStyle='#fff';
+        for(const [a,b] of pairs){ctx.beginPath();ctx.moveTo(pts[a].x*canvas.width,pts[a].y*canvas.height);ctx.lineTo(pts[b].x*canvas.width,pts[b].y*canvas.height);ctx.stroke();}
+        for(const i of [0,11,12,13,14,15,16,23,24,25,26,27,28]){ctx.beginPath();ctx.arc(pts[i].x*canvas.width,pts[i].y*canvas.height,5,0,Math.PI*2);ctx.fill();}
+      }
+    });
+    const cam=new Camera(video,{onFrame:async()=>{await pose.send({image:video});},width:640,height:480});
+    await cam.start();
+    ui.notice.textContent='Camera đã sẵn sàng';
+  }catch(err){
+    console.warn(err);
+    ui.notice.textContent='Camera chưa hoạt động – có thể dùng bàn phím để chơi';
+  }
+}
+
+ui.startBtn.onclick=async()=>{
+  ui.overlay.style.display='none';
+  running=true;
+  clock.start();
+  await startPose();
+};
+
+init3D(); animate();
+</script>
+</body>
+</html>
