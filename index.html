@@ -327,7 +327,7 @@ function traffic(z){
   if(side===1)g.userData={red,green};
  }
  g.position.set(0,0,z);scene.add(g);
- entities.push({mesh:g,type:'traffic',active:true,checked:false,state:'red',hold:0});
+ entities.push({mesh:g,type:'traffic',active:true,checked:false,state:'red',activated:false,redElapsed:0,obeyed:false});
 }
 
 function setLight(e,state){
@@ -403,17 +403,37 @@ function update(dt){
   if(e.type==='traffic'){
    if(wz>-12&&wz<24){
     special=true;
-    if(e.state==='red'){
-     ui.mission.textContent='RED LIGHT — STOP';
-     if(wz>2.2&&wz<8.5&&speed<1.2){
-      e.hold+=dt;
-      if(e.hold>=.9){
-       setLight(e,'green');score+=60;lights++;toast('GOOD STOP +60');
-      }
-     }else if(speed>1.2)e.hold=Math.max(0,e.hold-dt*.4);
 
+    // Activate the signal only when the player reaches the traffic-light zone.
+    if(!e.activated){
+     e.activated=true;
+     e.redElapsed=0;
+     e.state='red';
+     setLight(e,'red');
+    }
+
+    if(e.state==='red'){
+     ui.mission.textContent='RED LIGHT — WAIT';
+     e.redElapsed+=dt;
+
+     // Crossing the stop line while the signal is still red causes a penalty.
      if(wz>9.2&&!e.checked){
-      score=Math.max(0,score-70);hits++;e.checked=true;setLight(e,'green');toast('RED LIGHT -70');
+      score=Math.max(0,score-70);
+      hits++;
+      e.checked=true;
+      toast('RED LIGHT -70');
+     }
+
+     // The red light lasts exactly 1 second, then turns green automatically.
+     if(e.redElapsed>=1.0){
+      setLight(e,'green');
+
+      // Count a successful traffic stop if the player did not cross on red.
+      if(!e.checked){
+       lights++;
+       e.obeyed=true;
+       toast('GREEN LIGHT — GO');
+      }
      }
     }else{
      ui.mission.textContent='GREEN LIGHT — GO';
