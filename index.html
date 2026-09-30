@@ -39,6 +39,21 @@ button{margin-top:30px;border:0;border-radius:16px;padding:15px 30px;font-size:2
 .chip{min-width:130px;padding:12px 16px;border-radius:16px;background:rgba(255,255,255,.07)}
 .chip b{display:block;font-size:26px}
 .good{color:#7ff2bd}.bad{color:#ff9292}.gold{color:#ffe27a}
+
+/* === MARIO KART STYLE UPGRADE === */
+body{background:#73d7ff}
+.card{background:linear-gradient(180deg,rgba(20,35,80,.92),rgba(5,12,35,.9));border:2px solid rgba(255,255,255,.3);border-radius:22px}
+.metric{min-width:110px;border-radius:18px}
+.metric .v{font-size:34px;text-shadow:0 3px 0 #000}
+#cameraWrap{width:210px;height:158px;border:4px solid #fff;border-radius:24px;box-shadow:0 0 30px rgba(0,0,0,.5)}
+#status{top:190px;border-radius:20px}
+#mission{background:linear-gradient(90deg,#ffcf33,#ff7a00);color:#241300;border:3px solid #fff;text-shadow:none;border-radius:30px}
+#start,#finish{background:
+radial-gradient(circle at 50% 10%,rgba(255,230,60,.5),transparent 25%),
+linear-gradient(180deg,#41c9ff,#1455c7)}
+.panel{background:rgba(20,30,90,.9);border:4px solid #fff;border-radius:32px}
+h1{font-size:60px;text-shadow:0 5px 0 #000}
+button{background:linear-gradient(#ffe44d,#ff7b00);border:4px solid #fff;color:#222}
 </style>
 </head>
 <body>
@@ -118,18 +133,19 @@ let score=0,gifts=0,avoids=0,lights=0,hits=0;
 let entities=[],spawnCursor=-42,patternIndex=0;
 let keys={},gestureState='STOP';
 let leanFiltered=0;
+let gestureBoost=0; let lastGesture=''; let gestureStable=0;
 
 const lanes=[-4.4,0,4.4];
 const patterns=[
  {kind:'road',obs:[0],gift:2},
  {kind:'road',obs:[2],gift:0},
- {kind:'slow'},
+ {kind:'slow',move:'squat'},
  {kind:'road',obs:[1],gift:2},
- {kind:'traffic'},
+ {kind:'traffic',move:'jump'},
  {kind:'road',obs:[0,2],gift:1},
  {kind:'road',obs:[1],gift:0},
- {kind:'slow'},
- {kind:'traffic'},
+ {kind:'slow',move:'squat'},
+ {kind:'traffic',move:'jump'},
  {kind:'road',obs:[0,1],gift:2}
 ];
 
@@ -472,43 +488,37 @@ function detectGesture(lm){
  if(!lm)return;
  const nose=lm[0],ls=lm[11],rs=lm[12],lw=lm[15],rw=lm[16],lh=lm[23],rh=lm[24];
  const shoulderW=Math.max(.08,dist(ls,rs));
- const handsTouch=dist(lw,rw)<shoulderW*.78;
- const aboveHead=lw.y<nose.y+.055&&rw.y<nose.y+.055;
- const armsUp=lw.y<ls.y-.12&&rw.y<rs.y-.12;
- const armsSide=Math.abs(lw.y-ls.y)<.14&&Math.abs(rw.y-rs.y)<.14&&Math.abs(lw.x-ls.x)>.14&&Math.abs(rw.x-rs.x)>.14;
+
+ // Hands touching above head => accelerator
+ const handsTouch=dist(lw,rw)<shoulderW*.9;
+ const aboveHead=lw.y<nose.y+.10 && rw.y<nose.y+.10;
+ const armsUp=lw.y<ls.y-.08 && rw.y<rs.y-.08;
+ const armsSide=Math.abs(lw.y-ls.y)<.16&&Math.abs(rw.y-rs.y)<.16&&Math.abs(lw.x-ls.x)>.18&&Math.abs(rw.x-rs.x)>.18;
 
  const hipX=(lh.x+rh.x)/2;
  const shoulderX=(ls.x+rs.x)/2;
- const headX=nose.x;
+ const raw=((nose.x-hipX)*.65+(shoulderX-hipX)*.35)/shoulderW;
+ leanFiltered=leanFiltered*.25+raw*.75;
 
- // Stronger body-bend signal:
- // head deviation is weighted heavily, shoulders moderately.
- const raw=((headX-hipX)*0.72 + (shoulderX-hipX)*0.28)/shoulderW;
- leanFiltered=leanFiltered*.42+raw*.58;
-
- if(armsSide){
-  gestureState='STOP';gestureSteer=0;ui.gesture.textContent='STOP';ui.leanDot.style.left='50%';return;
+ let state='STOP', steer=0;
+ if(aboveHead && handsTouch){
+   let s=Math.max(-1,Math.min(1,-leanFiltered*9));
+   if(Math.abs(s)<.08)s=0;
+   steer=s;
+   state=Math.abs(s)>.18?(s<0?'LEFT':'RIGHT'):'RUN';
+ } else if(armsUp){
+   state='SLOW';
+ } else if(armsSide){
+   state='STOP';
  }
- if(armsUp&&!handsTouch){
-  gestureState='SLOW';gestureSteer=0;ui.gesture.textContent='SLOW';ui.leanDot.style.left='50%';return;
- }
 
- if(aboveHead&&handsTouch){
-  // extremely small dead zone
-  const dz=.004;
-  let s=0;
-  if(Math.abs(leanFiltered)>dz){
-   s=Math.sign(leanFiltered)*Math.min(1,(Math.abs(leanFiltered)-dz)/.075);
-  }
-
-  // mirror camera feel
-  s=-s;
-  gestureSteer=s;
-  ui.leanDot.style.left=(50+s*46)+'%';
-
-  if(s<-.06){gestureState='LEFT';ui.gesture.textContent='LEFT';return}
-  if(s>.06){gestureState='RIGHT';ui.gesture.textContent='RIGHT';return}
-  gestureState='RUN';ui.gesture.textContent='GO';return;
+ // anti-jitter: require stable gesture for a few frames
+ if(state===lastGesture) gestureStable++; else {gestureStable=0; lastGesture=state;}
+ if(gestureStable>2){
+   gestureState=state;
+   gestureSteer=steer;
+   ui.gesture.textContent=state==='RUN'?'BOOST':state;
+   ui.leanDot.style.left=(50+steer*46)+'%';
  }
 }
 
