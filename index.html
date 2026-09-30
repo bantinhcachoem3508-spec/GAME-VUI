@@ -469,11 +469,13 @@ function barrier(lane,z){
 }
 
 function gift(lane,z){
+  const texture=new THREE.TextureLoader().load('item_question_box_transparent.png');
+  const material=new THREE.SpriteMaterial({map:texture,transparent:true});
+  const sprite=new THREE.Sprite(material);
+  sprite.scale.set(2.1,2.1,1);
+  sprite.position.y=1.3;
   const g=new THREE.Group();
-  const coin=new THREE.Mesh(new THREE.TorusGeometry(.64,.18,12,24),new THREE.MeshStandardMaterial({color:0xffd54f,metalness:.5,roughness:.25}));
-  coin.rotation.y=Math.PI/2;coin.position.y=1.05;g.add(coin);
-  const core=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.18,16),new THREE.MeshStandardMaterial({color:0xffef9a,metalness:.45,roughness:.2}));
-  core.rotation.z=Math.PI/2;core.position.y=1.05;g.add(core);
+  g.add(sprite);
   g.position.set(lanes[lane],0,z);
   scene.add(g);
   entities.push({mesh:g,type:'gift',active:true,checked:false,spin:Math.random()*6});
@@ -501,10 +503,10 @@ function trafficLight(z){
     stripe.position.set(i*1.8,.055,-3.1);
     group.add(stripe);
   }
-  for(const side of [-1,1]){
-    const pillar=new THREE.Mesh(new THREE.BoxGeometry(.6,7.2,.6),new THREE.MeshStandardMaterial({color:0x657182,metalness:.4,roughness:.45}));
-    pillar.position.set(side*8.7,3.6,-.2); group.add(pillar);
-  }
+  // Traffic light placed on left side of road like real intersection
+  const pillar=new THREE.Mesh(new THREE.BoxGeometry(.6,7.2,.6),new THREE.MeshStandardMaterial({color:0x657182,metalness:.4,roughness:.45}));
+  pillar.position.set(-8.7,3.6,-.2);
+  group.add(pillar);
   const beam=new THREE.Mesh(new THREE.BoxGeometry(18.2,.7,.9),new THREE.MeshStandardMaterial({color:0xeff4f7,roughness:.35,metalness:.12}));
   beam.position.set(0,7.1,-.2); group.add(beam);
   const panel=new THREE.Mesh(new THREE.BoxGeometry(5.8,1.35,.4),new THREE.MeshStandardMaterial({color:0xd62929,emissive:0x360000,emissiveIntensity:.55}));
@@ -548,7 +550,7 @@ function spawnPattern(z){
 function update(dt){
   laneCooldown=Math.max(0,laneCooldown-dt);
 
-  targetSpeed = gestureMode==='RUN' ? 19.5 : 0;
+  targetSpeed = gestureMode==='RUN' ? 10.5 : 0;
   speed += (targetSpeed-speed)*Math.min(1,dt*4.3);
 
   const targetX=lanes[targetLaneIndex];
@@ -569,7 +571,7 @@ function update(dt){
     engineOsc.frequency.value = 80 + speed*12;
   }
 
-  ui.speed.textContent=Math.round(speed*6.2);
+  ui.speed.textContent=Math.round(speed*4.2);
   ui.score.textContent=Math.max(0,Math.round(score));
 
   let nearSpecial=false;
@@ -587,7 +589,17 @@ function update(dt){
       if(wz>-14 && wz<28){
         nearSpecial=true;
         if(e.state==='red'){
-          ui.mission.textContent='ĐÈN ĐỎ — HẠ TAY XUỐNG ĐỂ DỪNG';
+          ui.mission.textContent='ĐÈN ĐỎ — CHỜ 1-2 GIÂY';
+
+          // Automatic traffic cycle: red only lasts 1.5 seconds
+          e.hold += dt;
+          if(e.hold >= 1.5){
+            setTrafficColor(e,'green');
+            score += 40;
+            toast('GREEN LIGHT - GO','good');
+            ui.mission.textContent='ĐÈN XANH — TĂNG TỐC';
+          }
+
           if(wz>3 && wz<8.3 && speed<1.1){
             e.hold+=dt;
             if(e.hold>=.8){
@@ -599,7 +611,7 @@ function update(dt){
           }else if(wz>1 && wz<8.3 && speed>1.1){
             e.hold=Math.max(0,e.hold-dt*.35);
           }
-          if(wz>10 && !e.penalized){
+          if(wz>10 && !e.penalized && e.state==='red'){
             score=Math.max(0,score-85); hits++; e.penalized=true; e.checked=true;
             setTrafficColor(e,'green');
             sound('red'); toast('VƯỢT ĐÈN ĐỎ -85','bad');
@@ -644,7 +656,7 @@ function update(dt){
   }
 
   if(!nearSpecial){
-    ui.mission.textContent='Chạm 2 tay trên đầu để chạy • Nghiêng người để đổi làn';
+    ui.mission.textContent='Chạm 2 tay trên đầu để chạy chậm • Nghiêng người để đổi làn';
   }
 
   if(spawnCursor+worldZ>-720){
@@ -702,14 +714,14 @@ function detectGesture(lm){
   const handsTouch=dist(lw,rw)<shoulderW*.88;
   const aboveHead=lw.y<nose.y+.075 && rw.y<nose.y+.075;
   const rawLean=((nose.x-((lh.x+rh.x)/2))*.72 + (((ls.x+rs.x)/2)-((lh.x+rh.x)/2))*.28)/shoulderW;
-  leanFiltered=leanFiltered*.36 + rawLean*.64;
+  leanFiltered=leanFiltered*.18 + rawLean*.82;
 
   const runningPose=aboveHead && handsTouch;
   gestureMode=runningPose ? 'RUN' : 'STOP';
   ui.gesture.textContent=runningPose ? 'GO' : 'STOP';
 
-  let steerLevel=clamp(-leanFiltered*7.5,-1,1);
-  if(Math.abs(steerLevel)<.12) steerLevel=0;
+  let steerLevel=clamp(-leanFiltered*10,-1,1);
+  if(Math.abs(steerLevel)<.06) steerLevel=0;
   ui.leanDot.style.left=(50+steerLevel*45)+'%';
 
   const leanDir = steerLevel < -.34 ? -1 : (steerLevel > .34 ? 1 : 0);
