@@ -191,7 +191,7 @@ button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:2
 <script>
 const GAME_DURATION=60;
 const TRACK_LENGTH=2600;
-const SPAWN_GAP=42;
+const SPAWN_GAP=28;
 const ui={
   score:document.getElementById('score'),
   speed:document.getElementById('speed'),
@@ -283,6 +283,7 @@ function sound(type){
 }
 
 const lanes=[-4.8,0,4.8];
+// Challenge density: ~1.5x compared with v13
 const patterns=[
   {kind:'road',obs:[0],gift:2},
   {kind:'traffic'},
@@ -427,7 +428,7 @@ function makeGrassTexture(){
 function addMountains(){
   const matA=new THREE.MeshStandardMaterial({color:0x5b9c8a,roughness:1});
   const matB=new THREE.MeshStandardMaterial({color:0x83b7a0,roughness:1});
-  for(let i=0;i<18;i++){
+  for(let i=0;i<24;i++){
     const side=i%2?-1:1;
     const h=18+(i%5)*4;
     const r=12+(i%4)*3;
