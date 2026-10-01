@@ -1001,27 +1001,23 @@ function detectGesture(lm){
   const nose=lm[0], ls=lm[11], rs=lm[12], lw=lm[15], rw=lm[16], lh=lm[23], rh=lm[24];
   const shoulderW=Math.max(.10,dist(ls,rs));
 
-  // 1) Simple RUN gesture: both hands are on/above the head.
-  // We intentionally do not require pixel-perfect hand touching.
-  const headY=nose.y;
-  const handsAbove=(lw.y < headY+.12 && rw.y < headY+.12);
-  const handsNearHead=(dist(lw,nose)<shoulderW*1.35 && dist(rw,nose)<shoulderW*1.35);
-  const runningPose=handsAbove && handsNearHead;
+  // RUN: two hands are clearly raised above the shoulders and close together.
+  // This is intentionally tolerant: the player does NOT need to touch the exact
+  // top of the head for the camera to recognize the gesture.
+  const handsAboveShoulders = (lw.y < ls.y + .10) && (rw.y < rs.y + .10);
+  const handsAboveHead = (lw.y < nose.y + .18) && (rw.y < nose.y + .18);
+  const handsTogether = dist(lw,rw) < shoulderW * 1.65;
+  const runningPose = handsAboveShoulders && handsAboveHead && handsTogether;
 
   gestureMode=runningPose?'RUN':'STOP';
   ui.gesture.textContent=runningPose?'GO':'STOP';
 
-  // 2) Measure ONLY torso lean. Head movement is ignored so looking left/right
-  // does not steer the kart.
+  // Lane control uses only torso lean: shoulder center vs hip center.
   const hipCenter=(lh.x+rh.x)/2;
   const shoulderCenter=(ls.x+rs.x)/2;
   const rawLean=(shoulderCenter-hipCenter)/shoulderW;
+  leanFiltered=leanFiltered*.78 + rawLean*.22;
 
-  // Gentle low-pass filter: smooth but still responsive.
-  leanFiltered=leanFiltered*.72 + rawLean*.28;
-
-  // MediaPipe coordinates are not mirrored, while the preview is mirrored.
-  // Negative means player's left, positive means player's right.
   const steer=clamp(-leanFiltered,-1,1);
   ui.leanDot.style.left=(50+steer*45)+'%';
 
@@ -1033,27 +1029,19 @@ function detectGesture(lm){
     return;
   }
 
-  // 3) Three large zones + hysteresis.
-  // The middle band is intentionally wide so standing naturally stays in lane 2.
-  // A player must clearly lean before the car changes lane.
+  // Three simple zones. Mapping is unchanged:
+  // left = lane 1, straight = lane 2, right = lane 3.
   let desired=gestureLane;
+  if(steer < -.22) desired=0;
+  else if(steer > .22) desired=2;
+  else desired=1;
 
-  if(gestureLane===1){
-    if(steer < -.24) desired=0;
-    else if(steer > .24) desired=2;
-  }else if(gestureLane===0){
-    if(steer > -.09) desired=1;
-  }else if(gestureLane===2){
-    if(steer < .09) desired=1;
-  }
-
-  // 4) Require the new pose to remain stable for ~140 ms.
-  // This removes one-frame jumps without making the controls feel delayed.
+  // Short confirmation time removes camera jitter.
   if(desired!==gestureLane){
     if(gestureCandidate!==desired){
       gestureCandidate=desired;
       gestureCandidateSince=performance.now();
-    }else if(performance.now()-gestureCandidateSince>=140){
+    }else if(performance.now()-gestureCandidateSince>=120){
       gestureLane=desired;
       targetLaneIndex=gestureLane;
       gestureCandidateSince=0;
@@ -1070,15 +1058,34 @@ async function startPose(){
   const video=document.getElementById('video');
   const canvas=document.getElementById('poseCanvas');
   const ctx=canvas.getContext('2d');
+
   try{
-    const pose=new Pose({locateFile:file=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+    // Direct getUserMedia is more reliable on GitHub Pages than relying on
+    // the MediaPipe Camera helper, while keeping the same Pose detector.
+    const stream=await navigator.mediaDevices.getUserMedia({
+      video:{
+        facingMode:'user',
+        width:{ideal:480},
+        height:{ideal:360}
+      },
+      audio:false
+    });
+
+    video.srcObject=stream;
+    await video.play();
+
+    const pose=new Pose({
+      locateFile:file=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+    });
+
     pose.setOptions({
       modelComplexity:0,
       smoothLandmarks:true,
       enableSegmentation:false,
-      minDetectionConfidence:.34,
-      minTrackingConfidence:.34
+      minDetectionConfidence:.30,
+      minTrackingConfidence:.30
     });
+
     let cw=0,ch=0;
     pose.onResults(res=>{
       const nw=video.videoWidth||480, nh=video.videoHeight||360;
@@ -1086,45 +1093,63 @@ async function startPose(){
         cw=nw; ch=nh;
         canvas.width=cw; canvas.height=ch;
       }
+
       ctx.clearRect(0,0,cw,ch);
+
       if(res.poseLandmarks){
         detectGesture(res.poseLandmarks);
+
         const p=res.poseLandmarks;
-        const pairs=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
-        ctx.strokeStyle='#4ff4c2';ctx.fillStyle='#fff';ctx.lineWidth=4;
+        const pairs=[
+          [11,12],[11,13],[13,15],[12,14],[14,16],
+          [11,23],[12,24],[23,24],[23,25],[25,27],
+          [24,26],[26,28]
+        ];
+
+        ctx.strokeStyle='#4ff4c2';
+        ctx.fillStyle='#fff';
+        ctx.lineWidth=4;
+
         for(const [a,b] of pairs){
           ctx.beginPath();
-          ctx.moveTo(p[a].x*canvas.width,p[a].y*canvas.height);
-          ctx.lineTo(p[b].x*canvas.width,p[b].y*canvas.height);
+          ctx.moveTo(p[a].x*cw,p[a].y*ch);
+          ctx.lineTo(p[b].x*cw,p[b].y*ch);
           ctx.stroke();
         }
+
         for(const i of [0,11,12,13,14,15,16,23,24,25,26,27,28]){
           ctx.beginPath();
-          ctx.arc(p[i].x*canvas.width,p[i].y*canvas.height,5,0,Math.PI*2);
+          ctx.arc(p[i].x*cw,p[i].y*ch,5,0,Math.PI*2);
           ctx.fill();
         }
       }
     });
-    let lastPoseAt=0;
+
     let poseBusy=false;
-    const cam=new Camera(video,{
-      onFrame:async()=>{
-        const now=performance.now();
-        // Pose inference at ~24 FPS keeps motion control responsive without
-        // competing with the 3D renderer on lower-end laptops/phones.
-        if(poseBusy || now-lastPoseAt<42) return;
+    let lastPoseAt=0;
+
+    const processFrame=async(now)=>{
+      if(video.readyState>=2 && !poseBusy && now-lastPoseAt>=50){
         lastPoseAt=now;
         poseBusy=true;
-        try{ await pose.send({image:video}); } finally { poseBusy=false; }
-      },
-      width:480,
-      height:360
-    });
-    await cam.start();
-    toast('CAMERA READY','good');
+        try{
+          await pose.send({image:video});
+        }catch(err){
+          console.warn('Pose frame error:',err);
+        }finally{
+          poseBusy=false;
+        }
+      }
+      requestAnimationFrame(processFrame);
+    };
+
+    requestAnimationFrame(processFrame);
+    toast('CAMERA READY — GIƠ 2 TAY LÊN ĐẦU','good');
+
   }catch(err){
-    console.warn(err);
-    toast('CAMERA NOT AVAILABLE','bad');
+    console.error('Camera error:',err);
+    ui.gesture.textContent='CAMERA';
+    toast('KHÔNG MỞ ĐƯỢC CAMERA','bad');
   }
 }
 
