@@ -1171,11 +1171,11 @@ function detectGesture(lm){
   const centeredLean=rawLean-leanBaseline;
   leanFiltered=leanFiltered*.68 + centeredLean*.32;
 
-  // Keep the app's established physical mapping:
-  // LEFT -> negative steer -> lane 1
-  // CENTER -> lane 2
-  // RIGHT -> positive steer -> lane 3
-  const steer=clamp(leanFiltered,-1,1);
+  // Physical direction mapping for the front camera:
+  // MediaPipe sees the raw (unmirrored) camera frame. A player's physical
+  // LEFT is therefore toward +X, while physical RIGHT is toward -X.
+  // Convert that to the game convention: LEFT = negative steer.
+  const steer=clamp(-leanFiltered,-1,1);
   ui.leanDot.style.left=(50+steer*45)+'%';
   const dirDebug=document.getElementById('dirDebug');
   if(dirDebug) dirDebug.textContent=steer<-.22?'LEFT':(steer>.22?'RIGHT':'CENTER');
