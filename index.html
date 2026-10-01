@@ -20,7 +20,8 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,Helv
 .metric .v{font-size:34px;font-weight:900;text-shadow:0 3px 0 rgba(0,0,0,.55)}
 .metric .l{font-size:11px;opacity:.85;margin-top:6px;letter-spacing:1.3px;font-weight:700}
 #cameraWrap{position:fixed;right:22px;top:22px;width:220px;height:164px;z-index:24;border-radius:24px;overflow:hidden;background:#07111d;border:4px solid #fff;box-shadow:var(--shadow)}
-#video,#poseCanvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+#poseCanvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:none}
 #poseCanvas{pointer-events:none}
 #status{position:fixed;right:16px;top:192px;width:220px;z-index:24;padding:12px 14px;text-align:center;font-weight:700}
 #status strong{display:block;font-size:18px;margin-top:4px}
@@ -1111,25 +1112,20 @@ function detectGesture(lm){
   const nose=lm[0], ls=lm[11], rs=lm[12], lw=lm[15], rw=lm[16];
   const lh=lm[23], rh=lm[24];
 
-  // Ignore unstable frames when the main body landmarks are not reliable.
   const visible=p => (p.visibility===undefined || p.visibility>0.45);
   if(![nose,ls,rs,lw,rw,lh,rh].every(visible)) return;
 
   const shoulderW=Math.max(.10,dist(ls,rs));
 
-  // ---- RUN gesture ----
-  // Two hands above the head/shoulder line and reasonably close together.
-  // This is deliberately tolerant so children do not need a perfect pose.
+  // ---- RUN ----
   const handsHigh =
     lw.y < ls.y + .02 &&
     rw.y < rs.y + .02 &&
     lw.y < nose.y + .08 &&
     rw.y < nose.y + .08;
+  const handsTogether=dist(lw,rw)<shoulderW*1.90;
+  const runPose=handsHigh && handsTogether;
 
-  const handsTogether = dist(lw,rw) < shoulderW * 1.90;
-  const runPose = handsHigh && handsTogether;
-
-  // Debounce RUN/STOP so a single noisy frame cannot brake the car.
   if(runPose!==runStable){
     if(runPose!==runCandidate){
       runCandidate=runPose;
@@ -1146,49 +1142,45 @@ function detectGesture(lm){
   gestureMode=runStable?'RUN':'STOP';
   ui.gesture.textContent=runStable?'GO':'STOP';
 
-  // ---- 3-lane body lean ----
-  // Use torso tilt (shoulder midpoint vs hip midpoint), normalized by torso
-  // length rather than shoulder width. This is much more stable with camera
-  // distance and different student body sizes.
+  // ---- LEFT / CENTER / RIGHT ----
+  // The pose detector now receives the MIRRORED camera image.
+  // Therefore its X axis matches what the student sees:
+  // physical LEFT = negative X, physical RIGHT = positive X.
   const hipX=(lh.x+rh.x)/2;
   const hipY=(lh.y+rh.y)/2;
   const shoulderX=(ls.x+rs.x)/2;
   const shoulderY=(ls.y+rs.y)/2;
   const torsoLen=Math.max(.12,Math.hypot(shoulderX-hipX,shoulderY-hipY));
 
+  // Use torso displacement first, head displacement second.
+  // This responds to a simple whole-body lean instead of head turning alone.
   const torsoLean=(shoulderX-hipX)/torsoLen;
   const headLean=(nose.x-hipX)/torsoLen;
-  const rawLean=torsoLean*.72 + headLean*.28;
+  const rawLean=torsoLean*.78 + headLean*.22;
 
-  // Auto-zero only while the player is clearly near the middle.
   if(leanBaselineSamples<30 && Math.abs(rawLean)<.13){
-    leanBaseline += (rawLean-leanBaseline)*.28;
+    leanBaseline += (rawLean-leanBaseline)*.30;
     leanBaselineSamples++;
-  }else if(Math.abs(rawLean-leanBaseline)<.07 && gestureLane===1){
-    leanBaseline += (rawLean-leanBaseline)*.018;
+  }else if(Math.abs(rawLean-leanBaseline)<.06 && gestureLane===1){
+    leanBaseline += (rawLean-leanBaseline)*.015;
   }
 
   const centeredLean=rawLean-leanBaseline;
-  leanFiltered=leanFiltered*.68 + centeredLean*.32;
+  leanFiltered=leanFiltered*.70 + centeredLean*.30;
 
-  // Physical direction mapping for the front camera:
-  // MediaPipe sees the raw (unmirrored) camera frame. A player's physical
-  // LEFT is therefore toward +X, while physical RIGHT is toward -X.
-  // Convert that to the game convention: LEFT = negative steer.
-  const steer=clamp(-leanFiltered,-1,1);
+  // NO inversion here: mirrored input already has physical direction.
+  const steer=clamp(leanFiltered,-1,1);
+
   ui.leanDot.style.left=(50+steer*45)+'%';
   const dirDebug=document.getElementById('dirDebug');
   if(dirDebug) dirDebug.textContent=steer<-.22?'LEFT':(steer>.22?'RIGHT':'CENTER');
 
   if(!runStable) return;
 
-  // Hysteresis:
-  // strong left/right = switch lane;
-  // only a clearly upright posture returns to lane 2.
   let desired=gestureLane;
-  if(steer < -.22) desired=0;       // LEFT
-  else if(steer > .22) desired=2;    // RIGHT
-  else if(Math.abs(steer) < .12) desired=1; // CENTER
+  if(steer<-.22) desired=0;                 // physical LEFT
+  else if(steer>.22) desired=2;             // physical RIGHT
+  else if(Math.abs(steer)<.12) desired=1;   // CENTER
 
   if(desired!==gestureLane){
     if(gestureCandidate!==desired){
@@ -1279,12 +1271,28 @@ async function startPose(){
     let poseBusy=false;
     let lastPoseAt=0;
 
+    const inputCanvas=document.createElement('canvas');
+    const inputCtx=inputCanvas.getContext('2d');
+
     const processFrame=async(now)=>{
       if(video.readyState>=2 && !poseBusy && now-lastPoseAt>=50){
         lastPoseAt=now;
         poseBusy=true;
         try{
-          await pose.send({image:video});
+          const w=video.videoWidth||480, h=video.videoHeight||360;
+          if(inputCanvas.width!==w || inputCanvas.height!==h){
+            inputCanvas.width=w;
+            inputCanvas.height=h;
+          }
+
+          // Mirror the actual input before pose detection.
+          inputCtx.save();
+          inputCtx.translate(w,0);
+          inputCtx.scale(-1,1);
+          inputCtx.drawImage(video,0,0,w,h);
+          inputCtx.restore();
+
+          await pose.send({image:inputCanvas});
         }catch(err){
           console.warn('Pose frame error:',err);
         }finally{
