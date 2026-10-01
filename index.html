@@ -191,7 +191,7 @@ button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:2
 <script>
 const GAME_DURATION=60;
 const TRACK_LENGTH=2600;
-const SPAWN_GAP=28;
+const SPAWN_GAP=19;
 const ui={
   score:document.getElementById('score'),
   speed:document.getElementById('speed'),
@@ -808,7 +808,7 @@ function spawnPattern(z){
 
 function update(dt){
   laneCooldown=Math.max(0,laneCooldown-dt);
-  targetSpeed = gestureMode==='RUN' ? 13.5 : 0;
+  targetSpeed = gestureMode==='RUN' ? 20.25 : 0;
   speed += (targetSpeed-speed)*Math.min(1,dt*3.4);
 
   // Lane position is relative to the curved road center.
@@ -844,7 +844,7 @@ function update(dt){
     car.userData.flame.scale.y = .75 + Math.min(1.2,speed/10);
   }
   car.position.y = speed>1 ? Math.sin(performance.now()/95)*.025 : 0;
-  ui.speed.textContent=Math.round(speed*4.8);
+  ui.speed.textContent=Math.round(speed*7.2);
   ui.score.textContent=Math.max(0,Math.round(score));
   document.getElementById('speedFX').style.opacity=Math.min(.42,speed/26);
 
