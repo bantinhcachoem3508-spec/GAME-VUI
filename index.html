@@ -1170,9 +1170,9 @@ function detectGesture(lm){
   const centeredLean=rawLean-leanBaseline;
   leanFiltered=leanFiltered*.68 + centeredLean*.32;
 
-  // MediaPipe receives the camera frame in its native coordinate system.
-  // Do NOT invert it here: physical LEFT must map to lane 1.
-  const steer=clamp(leanFiltered,-1,1);
+  // Front-facing camera: physical LEFT appears on the image's RIGHT.
+  // Invert the x-direction so physical LEFT always maps to lane 1.
+  const steer=clamp(-leanFiltered,-1,1);
   ui.leanDot.style.left=(50+steer*45)+'%';
 
   if(!runStable) return;
