@@ -316,11 +316,10 @@ function init3D(){
   camera=new THREE.PerspectiveCamera(58,innerWidth/innerHeight,.1,700);
   camera.position.set(0,8.5,16.5);
 
-  renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-  renderer.setSize(innerWidth,innerHeight);
-  renderer.shadowMap.enabled=true;
-  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance',powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,1.25));
+  renderer.setSize(innerWidth,innerHeight,false);
+  renderer.shadowMap.enabled=false;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure=1.15;
   document.getElementById('game').appendChild(renderer.domElement);
@@ -328,14 +327,13 @@ function init3D(){
   scene.add(new THREE.HemisphereLight(0xf0fbff,0x448143,2.2));
   const sun=new THREE.DirectionalLight(0xffffff,2.9);
   sun.position.set(35,45,20);
-  sun.castShadow=true;
-  sun.shadow.mapSize.set(2048,2048);
+  sun.castShadow=false;
   scene.add(sun);
 
   createEnvironment();
   createKart();
 
-  for(let i=0;i<18;i++){
+  for(let i=0;i<8;i++){
     spawnPattern(spawnCursor);
     spawnCursor-=SPAWN_GAP;
   }
@@ -382,7 +380,7 @@ function createEnvironment(){
   createRibbon(16,.05,0x303640,-TRACK_LENGTH+100,125,5);
 
   // Curved white edge strips and red/white rumble blocks
-  for(let z=-TRACK_LENGTH+110;z<125;z+=5){
+  for(let z=-TRACK_LENGTH+110;z<125;z+=10){
     const c=trackCenter(z), s=trackSlope(z), p=Math.sqrt(1+s*s);
     for(const side of [-1,1]){
       const x=c+side*8.5/p;
@@ -401,7 +399,7 @@ function createEnvironment(){
   }
 
   // Lane dashes that follow the curve
-  for(let z=-TRACK_LENGTH+110;z<125;z+=9){
+  for(let z=-TRACK_LENGTH+110;z<125;z+=15){
     const c=trackCenter(z), s=trackSlope(z);
     for(const laneX of [-2.67,2.67]){
       const dash=new THREE.Mesh(new THREE.BoxGeometry(.16, .045, 4.5),
@@ -424,7 +422,7 @@ function createEnvironment(){
 function createScenery(){
   const colors=[0xff4b3e,0xffd44f,0x36c7ff,0x6ee36f,0xb76cff];
   // Grandstands, banners and trees
-  for(let i=0;i<25;i++){
+  for(let i=0;i<12;i++){
     const z=-55-i*92, c=trackCenter(z);
     for(const side of [-1,1]){
       const stand=new THREE.Group();
@@ -438,12 +436,12 @@ function createScenery(){
       }
       stand.position.set(c+side*(18+Math.abs(trackSlope(z))*3),0,z);
       stand.rotation.y=side===1?-0.3:0.3;
-      stand.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
+      stand.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});
       scene.add(stand);
     }
   }
 
-  for(let i=0;i<42;i++){
+  for(let i=0;i<20;i++){
     const z=-25-i*58,c=trackCenter(z),s=trackSlope(z);
     for(const side of [-1,1]){
       const x=c+side*(12.5+Math.random()*2.5);
@@ -457,7 +455,7 @@ function createScenery(){
         crown.position.y=3.1+k*.55; tree.add(crown);
       }
       tree.position.set(x,0,z); tree.rotation.y=side*.12;
-      tree.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
+      tree.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});
       scene.add(tree);
     }
   }
@@ -474,12 +472,12 @@ function createScenery(){
       new THREE.MeshStandardMaterial({color:colors[i%colors.length],roughness:.45,metalness:.1}));
     beam.position.set(c,8,0); arch.add(beam);
     arch.position.set(0,0,z);
-    arch.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
+    arch.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});
     scene.add(arch);
   }
 
   // Floating balloons for a festive kart-race atmosphere
-  for(let i=0;i<32;i++){
+  for(let i=0;i<12;i++){
     const z=-40-i*75,c=trackCenter(z);
     const balloon=new THREE.Mesh(new THREE.SphereGeometry(.65,16,12),
       new THREE.MeshStandardMaterial({color:colors[i%colors.length],roughness:.4}));
@@ -770,8 +768,11 @@ function update(dt){
   }
 }
 
-function loop(){
+let lastRenderAt=0;
+function loop(now=performance.now()){
   requestAnimationFrame(loop);
+  if(now-lastRenderAt<20) return; // ~50 FPS cap
+  lastRenderAt=now;
   const dt=Math.min(clock?clock.getDelta():.016,.05);
   if(running){
     timeLeft-=dt;
@@ -796,7 +797,7 @@ function endGame(){
 function resize(){
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
+  renderer.setSize(innerWidth,innerHeight,false);
 }
 
 function clamp(v,min,max){return Math.max(min,Math.min(max,v));}
@@ -856,16 +857,20 @@ async function startPose(){
   try{
     const pose=new Pose({locateFile:file=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
     pose.setOptions({
-      modelComplexity:1,
+      modelComplexity:0,
       smoothLandmarks:true,
       enableSegmentation:false,
-      minDetectionConfidence:.38,
-      minTrackingConfidence:.38
+      minDetectionConfidence:.34,
+      minTrackingConfidence:.34
     });
+    let cw=0,ch=0;
     pose.onResults(res=>{
-      canvas.width=video.videoWidth||640;
-      canvas.height=video.videoHeight||480;
-      ctx.clearRect(0,0,canvas.width,canvas.height);
+      const nw=video.videoWidth||480, nh=video.videoHeight||360;
+      if(cw!==nw || ch!==nh){
+        cw=nw; ch=nh;
+        canvas.width=cw; canvas.height=ch;
+      }
+      ctx.clearRect(0,0,cw,ch);
       if(res.poseLandmarks){
         detectGesture(res.poseLandmarks);
         const p=res.poseLandmarks;
@@ -884,7 +889,21 @@ async function startPose(){
         }
       }
     });
-    const cam=new Camera(video,{onFrame:async()=>pose.send({image:video}),width:640,height:480});
+    let lastPoseAt=0;
+    let poseBusy=false;
+    const cam=new Camera(video,{
+      onFrame:async()=>{
+        const now=performance.now();
+        // Pose inference at ~24 FPS keeps motion control responsive without
+        // competing with the 3D renderer on lower-end laptops/phones.
+        if(poseBusy || now-lastPoseAt<42) return;
+        lastPoseAt=now;
+        poseBusy=true;
+        try{ await pose.send({image:video}); } finally { poseBusy=false; }
+      },
+      width:480,
+      height:360
+    });
     await cam.start();
     toast('CAMERA READY','good');
   }catch(err){
