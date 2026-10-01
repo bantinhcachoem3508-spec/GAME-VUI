@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Mario Kart Motion Racing</title>
+<title>Mario Kart Motion GP • V11</title>
 <style>
 :root{
   --white:#fff;
@@ -321,11 +321,11 @@ function init3D(){
   renderer.setSize(innerWidth,innerHeight,false);
   renderer.shadowMap.enabled=false;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure=1.15;
+  renderer.toneMappingExposure=1.28;
   document.getElementById('game').appendChild(renderer.domElement);
 
-  scene.add(new THREE.HemisphereLight(0xf0fbff,0x448143,2.2));
-  const sun=new THREE.DirectionalLight(0xffffff,2.9);
+  scene.add(new THREE.HemisphereLight(0xdff7ff,0x2e6e3e,2.45));
+  const sun=new THREE.DirectionalLight(0xfff4d2,3.0);
   sun.position.set(35,45,20);
   sun.castShadow=false;
   scene.add(sun);
@@ -367,17 +367,129 @@ function createRibbon(width, y, color, zMin, zMax, step, offsetY=0){
   const m=new THREE.MeshStandardMaterial({color,roughness:.92,metalness:.02,side:THREE.DoubleSide});
   const mesh=new THREE.Mesh(g,m); mesh.receiveShadow=true; scene.add(mesh); return mesh;
 }
+
+function makeSkyTexture(){
+  const c=document.createElement('canvas');
+  c.width=512;c.height=512;
+  const ctx=c.getContext('2d');
+  const g=ctx.createLinearGradient(0,0,0,512);
+  g.addColorStop(0,'#36b9ff');
+  g.addColorStop(.48,'#83dcff');
+  g.addColorStop(1,'#e9f8ff');
+  ctx.fillStyle=g;ctx.fillRect(0,0,512,512);
+  // soft stylized clouds
+  ctx.fillStyle='rgba(255,255,255,.72)';
+  for(const [x,y,s] of [[80,115,34],[128,105,48],[178,118,30],[355,170,42],[400,158,32],[438,174,25]]){
+    ctx.beginPath();ctx.arc(x,y,s,0,Math.PI*2);ctx.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+
+function makeRoadTexture(){
+  const c=document.createElement('canvas');
+  c.width=256;c.height=512;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#2d3440';ctx.fillRect(0,0,256,512);
+  for(let i=0;i<650;i++){
+    const v=42+Math.random()*30;
+    ctx.fillStyle=`rgba(${v},${v},${v},${.16+Math.random()*.14})`;
+    const x=Math.random()*256,y=Math.random()*512,s=.5+Math.random()*2.2;
+    ctx.fillRect(x,y,s,s);
+  }
+  for(let y=20;y<512;y+=82){
+    ctx.fillStyle='rgba(255,255,255,.035)';
+    ctx.fillRect(0,y,256,2);
+  }
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=THREE.RepeatWrapping;t.wrapT=THREE.RepeatWrapping;
+  t.repeat.set(1,5);
+  t.anisotropy=2;
+  return t;
+}
+
+function makeGrassTexture(){
+  const c=document.createElement('canvas');
+  c.width=256;c.height=256;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle='#4ea64f';ctx.fillRect(0,0,256,256);
+  for(let i=0;i<900;i++){
+    const x=Math.random()*256,y=Math.random()*256;
+    ctx.fillStyle=Math.random()>.5?'rgba(255,255,255,.045)':'rgba(0,45,0,.055)';
+    ctx.fillRect(x,y,1+Math.random()*2,1+Math.random()*2);
+  }
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=THREE.RepeatWrapping;t.wrapT=THREE.RepeatWrapping;
+  t.repeat.set(12,35);
+  t.anisotropy=2;
+  return t;
+}
+
+function addMountains(){
+  const matA=new THREE.MeshStandardMaterial({color:0x5b9c8a,roughness:1});
+  const matB=new THREE.MeshStandardMaterial({color:0x83b7a0,roughness:1});
+  for(let i=0;i<18;i++){
+    const side=i%2?-1:1;
+    const h=18+(i%5)*4;
+    const r=12+(i%4)*3;
+    const m=new THREE.Mesh(new THREE.ConeGeometry(r,h,7),i%3?matA:matB);
+    m.position.set(side*(31+(i%4)*5),h/2,-80-i*62);
+    m.rotation.y=(i%7)*.2;
+    scene.add(m);
+  }
+}
+
+function addClouds(){
+  const cloudMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.72});
+  for(let i=0;i<9;i++){
+    const g=new THREE.Group();
+    for(let k=0;k<3;k++){
+      const puff=new THREE.Mesh(new THREE.SphereGeometry(1.4+(k%2)*.45,10,8),cloudMat);
+      puff.position.set((k-1)*1.4,Math.sin(k)*.25,0);
+      g.add(puff);
+    }
+    g.position.set((i%2?-1:1)*(24+(i%3)*7),15+(i%3)*4,-55-i*95);
+    g.scale.setScalar(1.5+(i%2)*.35);
+    scene.add(g);
+  }
+}
+
+function addCurveSigns(){
+  const poleMat=new THREE.MeshStandardMaterial({color:0x596574,roughness:.7});
+  const signMats=[
+    new THREE.MeshStandardMaterial({color:0xffdf3f,emissive:0x5a3d00,emissiveIntensity:.2,roughness:.35}),
+    new THREE.MeshStandardMaterial({color:0xff5b4d,emissive:0x4d0900,emissiveIntensity:.18,roughness:.35})
+  ];
+  for(let i=0;i<18;i++){
+    const z=-45-i*105;
+    const c=trackCenter(z), s=trackSlope(z);
+    const side=s>0?1:-1;
+    const g=new THREE.Group();
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.07,.09,2.2,8),poleMat);
+    pole.position.y=1.1;g.add(pole);
+    const sign=new THREE.Mesh(new THREE.ConeGeometry(.62,.62,4),signMats[i%2]);
+    sign.rotation.z=Math.PI/2;sign.position.set(0,2.25,0);g.add(sign);
+    g.position.set(c+side*11.2,0,z);
+    g.rotation.y=Math.atan(s);
+    scene.add(g);
+  }
+}
+
 function createEnvironment(){
-  scene.background=new THREE.Color(0x78d9ff);
-  scene.fog=new THREE.Fog(0x9de4ff,55,270);
+  scene.background=makeSkyTexture();
+  scene.fog=new THREE.Fog(0x9bdfff,60,290);
 
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(420,TRACK_LENGTH),
-    new THREE.MeshStandardMaterial({color:0x58a94f,roughness:1}));
+    new THREE.MeshStandardMaterial({map:makeGrassTexture(),color:0xffffff,roughness:1}));
   ground.rotation.x=-Math.PI/2; ground.position.set(0,-.08,-TRACK_LENGTH/2+70);
-  ground.receiveShadow=true; scene.add(ground);
+  ground.receiveShadow=false; scene.add(ground);
 
-  createRibbon(22,.02,0xe6d8b8,-TRACK_LENGTH+100,125,5);
-  createRibbon(16,.05,0x303640,-TRACK_LENGTH+100,125,5);
+  createRibbon(22,.02,0xf1dcb8,-TRACK_LENGTH+100,125,5);
+  const road=createRibbon(16,.05,0xffffff,-TRACK_LENGTH+100,125,5);
+  road.material.map=makeRoadTexture();
+  road.material.color.set(0xffffff);
+  road.material.roughness=.82;
+  addMountains();
+  addClouds();
 
   // Curved white edge strips and red/white rumble blocks
   for(let z=-TRACK_LENGTH+110;z<125;z+=10){
@@ -418,6 +530,7 @@ function createEnvironment(){
   }
 
   createScenery();
+  addCurveSigns();
 }
 function createScenery(){
   const colors=[0xff4b3e,0xffd44f,0x36c7ff,0x6ee36f,0xb76cff];
@@ -476,13 +589,29 @@ function createScenery(){
     scene.add(arch);
   }
 
+  // Colorful roadside banners and pennants
+  const bannerColors=[0xff3f5e,0xffd43b,0x2fd5ff,0x5de77b,0xa56cff];
+  for(let i=0;i<16;i++){
+    const z=-30-i*82,c=trackCenter(z);
+    const side=i%2?-1:1;
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,4.6,8),
+      new THREE.MeshStandardMaterial({color:0x6d7784,roughness:.7}));
+    pole.position.set(c+side*11.4,2.3,z);
+    scene.add(pole);
+    const flag=new THREE.Mesh(new THREE.PlaneGeometry(2.1,1.1),
+      new THREE.MeshBasicMaterial({color:bannerColors[i%bannerColors.length],side:THREE.DoubleSide}));
+    flag.position.set(c+side*11.4+side*1.0,3.6,z);
+    flag.rotation.y=side<0?Math.PI:0;
+    scene.add(flag);
+  }
+
   // Floating balloons for a festive kart-race atmosphere
   for(let i=0;i<12;i++){
     const z=-40-i*75,c=trackCenter(z);
     const balloon=new THREE.Mesh(new THREE.SphereGeometry(.65,16,12),
       new THREE.MeshStandardMaterial({color:colors[i%colors.length],roughness:.4}));
     balloon.position.set(c+(i%2?15:-15),7+(i%3)*.8,z);
-    balloon.castShadow=true; scene.add(balloon);
+    balloon.castShadow=false; scene.add(balloon);
     const rope=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,4.5,6),
       new THREE.MeshStandardMaterial({color:0xffffff,roughness:.8}));
     rope.position.set(balloon.position.x,4.7,balloon.position.z); scene.add(rope);
@@ -540,6 +669,36 @@ function createKart(){
     const h=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,.46,14),hubMat);
     h.rotation.z=Math.PI/2; h.position.set(sx*1.28,.45,sz); car.add(h);
   }
+
+  // Rounded visual details: bumpers, fenders, lights
+  const bumper=new THREE.Mesh(new THREE.BoxGeometry(2.15,.18,.32),
+    new THREE.MeshStandardMaterial({color:0x202832,metalness:.55,roughness:.28}));
+  bumper.position.set(0,.72,-2.45);car.add(bumper);
+
+  for(const sx of [-1,1]){
+    const fender=new THREE.Mesh(new THREE.TorusGeometry(.62,.11,8,18,Math.PI),
+      accentMat);
+    fender.rotation.z=Math.PI/2;
+    fender.position.set(sx*1.25,.58,-1.42);
+    car.add(fender);
+
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.16,12,8),
+      new THREE.MeshBasicMaterial({color:0xffffff}));
+    head.position.set(sx*.65,.94,-2.58);car.add(head);
+
+    const tail=new THREE.Mesh(new THREE.SphereGeometry(.13,10,8),
+      new THREE.MeshBasicMaterial({color:0xff2d2d}));
+    tail.position.set(sx*.82,.9,2.43);car.add(tail);
+  }
+
+  const underGlow=new THREE.Mesh(new THREE.PlaneGeometry(2.2,2.9),
+    new THREE.MeshBasicMaterial({color:0xffb000,transparent:true,opacity:.11,side:THREE.DoubleSide}));
+  underGlow.rotation.x=-Math.PI/2;underGlow.position.y=.18;underGlow.position.z=.2;car.add(underGlow);
+
+  const flameMat=new THREE.MeshBasicMaterial({color:0xffb52e,transparent:true,opacity:0});
+  const flame=new THREE.Mesh(new THREE.ConeGeometry(.16,.75,8),flameMat);
+  flame.rotation.x=-Math.PI/2;flame.position.set(0,.55,2.78);car.add(flame);
+  car.userData.flame=flame;
 
   for(const x of [-.58,.58]){
     const ex=new THREE.Mesh(new THREE.CylinderGeometry(.1,.12,.65,12),chrome);
@@ -679,6 +838,11 @@ function update(dt){
     engineGain.gain.value=speed>1?.035:0;
     engineOsc.frequency.value=82+speed*12;
   }
+  if(car.userData.flame){
+    car.userData.flame.material.opacity = speed>2 ? Math.min(.85,(speed-2)/10) : 0;
+    car.userData.flame.scale.y = .75 + Math.min(1.2,speed/10);
+  }
+  car.position.y = speed>1 ? Math.sin(performance.now()/95)*.025 : 0;
   ui.speed.textContent=Math.round(speed*4.2);
   ui.score.textContent=Math.max(0,Math.round(score));
   document.getElementById('speedFX').style.opacity=Math.min(.42,speed/26);
