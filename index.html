@@ -27,7 +27,26 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,Helv
 #leanTrack{height:8px;background:rgba(255,255,255,.15);border-radius:999px;margin-top:10px;overflow:hidden;position:relative}
 #leanDot{position:absolute;top:0;left:50%;width:18px;height:8px;background:#67ffd5;border-radius:999px;transform:translateX(-50%)}
 #mission{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:25;min-width:min(820px,84vw);padding:13px 18px;text-align:center;font-weight:900;font-size:18px;background:linear-gradient(180deg,#ffe05c,#ff8e00);color:#271500;border:4px solid #fff;border-radius:999px;box-shadow:var(--shadow)}
-#toast{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:40;padding:12px 22px;border-radius:999px;background:rgba(10,19,55,.94);border:2px solid rgba(255,255,255,.82);font-weight:900;opacity:0;transition:.18s;pointer-events:none}
+#toast{
+  position:fixed;
+  right:18px;
+  top:196px;
+  left:auto;
+  transform:none;
+  z-index:40;
+  min-width:170px;
+  max-width:245px;
+  padding:10px 16px;
+  border-radius:999px;
+  background:rgba(10,19,55,.96);
+  border:2px solid rgba(255,255,255,.82);
+  font-weight:900;
+  text-align:center;
+  opacity:0;
+  transition:.18s;
+  pointer-events:none;
+  box-shadow:0 8px 24px rgba(0,0,0,.28);
+}
 #toast.show{opacity:1}
 #timebar{position:fixed;left:18px;right:270px;bottom:16px;height:10px;background:rgba(255,255,255,.18);z-index:20;border-radius:999px;overflow:hidden;border:2px solid rgba(255,255,255,.6)}
 #timefill{height:100%;width:100%;background:linear-gradient(90deg,#36f0b7,#3db9ff,#ffd83d)}
@@ -118,6 +137,7 @@ button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:2
 #itemBadge img{width:64px;height:64px;object-fit:contain}
 #boostFlash{position:fixed;inset:0;z-index:7;pointer-events:none;opacity:0;background:radial-gradient(circle,rgba(255,242,120,.35),transparent 45%);transition:opacity .1s}
 @media(max-width:900px){
+  #toast{right:12px;top:164px;max-width:210px;min-width:145px;padding:8px 12px;font-size:13px}
   #hud{left:12px;right:12px;transform:none;justify-content:flex-start}
   #hud .metric{min-width:88px}
   #cameraWrap{width:175px;height:132px}
@@ -874,23 +894,26 @@ function update(dt){
   targetSpeed = gestureMode==='RUN' ? 20.25 : 0;
   speed += (targetSpeed-speed)*Math.min(1,dt*3.4);
 
-  // Lane position is relative to the curved road center.
-  const roadLocalZ=car.position.z-worldZ;
-  const roadX=trackCenter(roadLocalZ);
-
-  // Road width = 16. The two lane divider lines are at ±2.67,
-  // so the three lane centers are at ±16/3 and 0.
-  // Project the offset perpendicular to the curved road so the car
-  // remains visually centered even on bends.
-  const roadSlope=trackSlope(roadLocalZ);
+  // Exact lane center at the car's CURRENT world position.
+  // The whole road scene moves by +worldZ, so using (car.z - worldZ)
+  // was incorrect and made the car drift away from the visual lane center.
+  const roadWorldZ=car.position.z+worldZ;
+  const roadX=trackCenter(roadWorldZ);
+  const roadSlope=trackSlope(roadWorldZ);
   const perpendicularScale=Math.sqrt(1+roadSlope*roadSlope);
+
+  // Road width = 16, therefore the three geometric lane centers are:
+  // -16/3, 0, +16/3 measured perpendicular to the curved road.
   const exactLaneOffset=(targetLaneIndex-1)*(16/3);
   const targetX=roadX + exactLaneOffset/perpendicularScale;
 
-  car.position.x += (targetX-car.position.x)*Math.min(1,dt*5.5);
+  car.position.x += (targetX-car.position.x)*Math.min(1,dt*6.5);
   const dx=targetX-car.position.x;
-  car.rotation.z += ((-dx*.075)-car.rotation.z)*Math.min(1,dt*7);
-  car.rotation.y += ((dx*.032)-car.rotation.y)*Math.min(1,dt*7);
+
+  // Align the kart with the road tangent as well as its selected lane.
+  const roadYaw=Math.atan(roadSlope);
+  car.rotation.z += ((-dx*.055)-car.rotation.z)*Math.min(1,dt*7);
+  car.rotation.y += ((roadYaw+dx*.020)-car.rotation.y)*Math.min(1,dt*6);
 
   // Wheel animation
   if(car.userData.wheels){
@@ -1060,56 +1083,96 @@ function setMiddleLane(){
 let gestureLane=1;
 let gestureCandidate=1;
 let gestureCandidateSince=0;
-let lastRunningPose=false;
 let leanFiltered=0;
+let leanBaseline=0;
+let leanBaselineSamples=0;
+let runStable=false;
+let runCandidate=false;
+let runCandidateSince=0;
 
 function detectGesture(lm){
   if(!lm) return;
 
-  const nose=lm[0], ls=lm[11], rs=lm[12], lw=lm[15], rw=lm[16], lh=lm[23], rh=lm[24];
+  const nose=lm[0], ls=lm[11], rs=lm[12], lw=lm[15], rw=lm[16];
+  const lh=lm[23], rh=lm[24];
+
+  // Ignore unstable frames when the main body landmarks are not reliable.
+  const visible=p => (p.visibility===undefined || p.visibility>0.45);
+  if(![nose,ls,rs,lw,rw,lh,rh].every(visible)) return;
+
   const shoulderW=Math.max(.10,dist(ls,rs));
 
-  // RUN: two hands are clearly raised above the shoulders and close together.
-  // This is intentionally tolerant: the player does NOT need to touch the exact
-  // top of the head for the camera to recognize the gesture.
-  const handsAboveShoulders = (lw.y < ls.y + .10) && (rw.y < rs.y + .10);
-  const handsAboveHead = (lw.y < nose.y + .18) && (rw.y < nose.y + .18);
-  const handsTogether = dist(lw,rw) < shoulderW * 1.65;
-  const runningPose = handsAboveShoulders && handsAboveHead && handsTogether;
+  // ---- RUN gesture ----
+  // Two hands above the head/shoulder line and reasonably close together.
+  // This is deliberately tolerant so children do not need a perfect pose.
+  const handsHigh =
+    lw.y < ls.y + .02 &&
+    rw.y < rs.y + .02 &&
+    lw.y < nose.y + .08 &&
+    rw.y < nose.y + .08;
 
-  gestureMode=runningPose?'RUN':'STOP';
-  ui.gesture.textContent=runningPose?'GO':'STOP';
+  const handsTogether = dist(lw,rw) < shoulderW * 1.90;
+  const runPose = handsHigh && handsTogether;
 
-  // Lane control uses only torso lean: shoulder center vs hip center.
-  const hipCenter=(lh.x+rh.x)/2;
-  const shoulderCenter=(ls.x+rs.x)/2;
-  const rawLean=(shoulderCenter-hipCenter)/shoulderW;
-  leanFiltered=leanFiltered*.78 + rawLean*.22;
+  // Debounce RUN/STOP so a single noisy frame cannot brake the car.
+  if(runPose!==runStable){
+    if(runPose!==runCandidate){
+      runCandidate=runPose;
+      runCandidateSince=performance.now();
+    }else if(performance.now()-runCandidateSince>=140){
+      runStable=runCandidate;
+      runCandidateSince=0;
+    }
+  }else{
+    runCandidate=runStable;
+    runCandidateSince=0;
+  }
 
+  gestureMode=runStable?'RUN':'STOP';
+  ui.gesture.textContent=runStable?'GO':'STOP';
+
+  // ---- 3-lane body lean ----
+  // Use torso tilt (shoulder midpoint vs hip midpoint), normalized by torso
+  // length rather than shoulder width. This is much more stable with camera
+  // distance and different student body sizes.
+  const hipX=(lh.x+rh.x)/2;
+  const hipY=(lh.y+rh.y)/2;
+  const shoulderX=(ls.x+rs.x)/2;
+  const shoulderY=(ls.y+rs.y)/2;
+  const torsoLen=Math.max(.12,Math.hypot(shoulderX-hipX,shoulderY-hipY));
+
+  const rawLean=(shoulderX-hipX)/torsoLen;
+
+  // Auto-zero small natural camera/body bias while the student is near center.
+  if(leanBaselineSamples<25 && Math.abs(rawLean)<.16){
+    leanBaseline += (rawLean-leanBaseline)*.25;
+    leanBaselineSamples++;
+  }else if(Math.abs(rawLean-leanBaseline)<.10 && gestureLane===1){
+    leanBaseline += (rawLean-leanBaseline)*.025;
+  }
+
+  const centeredLean=rawLean-leanBaseline;
+  leanFiltered=leanFiltered*.68 + centeredLean*.32;
+
+  // Camera is mirrored for the student, so invert the landmark direction.
   const steer=clamp(-leanFiltered,-1,1);
   ui.leanDot.style.left=(50+steer*45)+'%';
 
-  if(!runningPose){
-    gestureCandidate=gestureLane=1;
-    gestureCandidateSince=0;
-    lastRunningPose=false;
-    pendingLane=1;
-    return;
-  }
+  if(!runStable) return;
 
-  // Three simple zones. Mapping is unchanged:
-  // left = lane 1, straight = lane 2, right = lane 3.
+  // Hysteresis:
+  // strong left/right = switch lane;
+  // only a clearly upright posture returns to lane 2.
   let desired=gestureLane;
   if(steer < -.22) desired=0;
   else if(steer > .22) desired=2;
-  else desired=1;
+  else if(Math.abs(steer) < .12) desired=1;
 
-  // Short confirmation time removes camera jitter.
   if(desired!==gestureLane){
     if(gestureCandidate!==desired){
       gestureCandidate=desired;
       gestureCandidateSince=performance.now();
-    }else if(performance.now()-gestureCandidateSince>=120){
+    }else if(performance.now()-gestureCandidateSince>=160){
       gestureLane=desired;
       pendingLane=gestureLane;
       gestureCandidateSince=0;
@@ -1118,8 +1181,6 @@ function detectGesture(lm){
     gestureCandidate=gestureLane;
     gestureCandidateSince=0;
   }
-
-  lastRunningPose=true;
 }
 
 async function startPose(){
@@ -1227,7 +1288,10 @@ document.getElementById('startBtn').onclick=async()=>{
   running=true;
   timeLeft=GAME_DURATION;
   score=0;gifts=0;avoids=0;lights=0;hits=0;
-  worldZ=0; speed=0; targetSpeed=0; laneIndex=1; targetLaneIndex=1; gestureLane=1; gestureCandidate=1; gestureCandidateSince=0; leanFiltered=0;
+  worldZ=0; speed=0; targetSpeed=0; laneIndex=1; targetLaneIndex=1;
+  gestureLane=1; gestureCandidate=1; gestureCandidateSince=0;
+  leanFiltered=0; leanBaseline=0; leanBaselineSamples=0;
+  runStable=false; runCandidate=false; runCandidateSince=0;
   pendingLane=1; beatIndex=0; lastBeatAt=-1; rhythmCombo=0; car.position.x=trackCenter(8.5); scene.position.z=0;
   clock.start();
   await startPose();
