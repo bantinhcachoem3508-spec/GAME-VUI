@@ -214,7 +214,7 @@ let scene,camera,renderer,car,clock;
 let worldZ=0,speed=0,targetSpeed=0,running=false,timeLeft=GAME_DURATION;
 let score=0,gifts=0,avoids=0,lights=0,hits=0;
 let entities=[],spawnCursor=-55,patternIndex=0;
-let leanFiltered=0,gestureMode='STOP';
+let gestureMode='STOP';
 let laneIndex=1,targetLaneIndex=1,laneCooldown=0,lastLeanDir=0;
 
 // ===== GAME AUDIO SYSTEM =====
@@ -808,17 +808,17 @@ function spawnPattern(z){
 function update(dt){
   laneCooldown=Math.max(0,laneCooldown-dt);
   targetSpeed = gestureMode==='RUN' ? 10.5 : 0;
-  speed += (targetSpeed-speed)*Math.min(1,dt*4.3);
+  speed += (targetSpeed-speed)*Math.min(1,dt*3.4);
 
   // Lane position is relative to the curved road center.
   const roadLocalZ=car.position.z-worldZ;
   const roadX=trackCenter(roadLocalZ);
   const targetX=roadX+lanes[targetLaneIndex];
 
-  car.position.x += (targetX-car.position.x)*Math.min(1,dt*7.5);
+  car.position.x += (targetX-car.position.x)*Math.min(1,dt*5.5);
   const dx=targetX-car.position.x;
-  car.rotation.z += ((-dx*.10)-car.rotation.z)*Math.min(1,dt*10);
-  car.rotation.y += ((dx*.045)-car.rotation.y)*Math.min(1,dt*10);
+  car.rotation.z += ((-dx*.075)-car.rotation.z)*Math.min(1,dt*7);
+  car.rotation.y += ((dx*.032)-car.rotation.y)*Math.min(1,dt*7);
 
   // Wheel animation
   if(car.userData.wheels){
@@ -924,7 +924,7 @@ function update(dt){
   }
 
   if(!nearSpecial){
-    ui.mission.textContent='🙌 TAY TRÊN ĐẦU • NGHIÊNG TRÁI / THẲNG / NGHIÊNG PHẢI ĐỂ CHỌN 3 LÀN';
+    ui.mission.textContent='🙌 GIỮ 2 TAY TRÊN ĐẦU • TRÁI = 1 • THẲNG = 2 • PHẢI = 3';
   }
   if(spawnCursor+worldZ>-720){
     spawnPattern(spawnCursor);
@@ -980,38 +980,81 @@ function setMiddleLane(){
 }
 
 
+let gestureLane=1;
+let gestureCandidate=1;
+let gestureCandidateSince=0;
+let lastRunningPose=false;
+let leanFiltered=0;
+
 function detectGesture(lm){
   if(!lm) return;
+
   const nose=lm[0], ls=lm[11], rs=lm[12], lw=lm[15], rw=lm[16], lh=lm[23], rh=lm[24];
-  const shoulderW=Math.max(.08,dist(ls,rs));
+  const shoulderW=Math.max(.10,dist(ls,rs));
 
-  // More forgiving "hands above head" detection.
-  const handsTouch=dist(lw,rw)<shoulderW*1.12;
-  const aboveHead=(lw.y<nose.y+.16 && rw.y<nose.y+.16) && (lw.y<ls.y+.12 && rw.y<rs.y+.12);
-  const runningPose=aboveHead && handsTouch;
-
-  const hipCenter=(lh.x+rh.x)/2;
-  const shoulderCenter=(ls.x+rs.x)/2;
-  const rawLean=((nose.x-hipCenter)*.70+(shoulderCenter-hipCenter)*.30)/shoulderW;
-  leanFiltered=leanFiltered*.12+rawLean*.88;
+  // 1) Simple RUN gesture: both hands are on/above the head.
+  // We intentionally do not require pixel-perfect hand touching.
+  const headY=nose.y;
+  const handsAbove=(lw.y < headY+.12 && rw.y < headY+.12);
+  const handsNearHead=(dist(lw,nose)<shoulderW*1.35 && dist(rw,nose)<shoulderW*1.35);
+  const runningPose=handsAbove && handsNearHead;
 
   gestureMode=runningPose?'RUN':'STOP';
   ui.gesture.textContent=runningPose?'GO':'STOP';
 
-  const steerLevel=clamp(-leanFiltered*7.5,-1,1);
-  ui.leanDot.style.left=(50+steerLevel*45)+'%';
+  // 2) Measure ONLY torso lean. Head movement is ignored so looking left/right
+  // does not steer the kart.
+  const hipCenter=(lh.x+rh.x)/2;
+  const shoulderCenter=(ls.x+rs.x)/2;
+  const rawLean=(shoulderCenter-hipCenter)/shoulderW;
 
-  // Exact mapping requested:
-  // left = lane 1, straight = lane 2, right = lane 3.
-  if(runningPose){
-    if(steerLevel < -.14){
-      targetLaneIndex=0;
-    }else if(steerLevel > .14){
-      targetLaneIndex=2;
-    }else{
-      targetLaneIndex=1;
-    }
+  // Gentle low-pass filter: smooth but still responsive.
+  leanFiltered=leanFiltered*.72 + rawLean*.28;
+
+  // MediaPipe coordinates are not mirrored, while the preview is mirrored.
+  // Negative means player's left, positive means player's right.
+  const steer=clamp(-leanFiltered,-1,1);
+  ui.leanDot.style.left=(50+steer*45)+'%';
+
+  if(!runningPose){
+    gestureCandidate=gestureLane=1;
+    gestureCandidateSince=0;
+    lastRunningPose=false;
+    targetLaneIndex=1;
+    return;
   }
+
+  // 3) Three large zones + hysteresis.
+  // The middle band is intentionally wide so standing naturally stays in lane 2.
+  // A player must clearly lean before the car changes lane.
+  let desired=gestureLane;
+
+  if(gestureLane===1){
+    if(steer < -.24) desired=0;
+    else if(steer > .24) desired=2;
+  }else if(gestureLane===0){
+    if(steer > -.09) desired=1;
+  }else if(gestureLane===2){
+    if(steer < .09) desired=1;
+  }
+
+  // 4) Require the new pose to remain stable for ~140 ms.
+  // This removes one-frame jumps without making the controls feel delayed.
+  if(desired!==gestureLane){
+    if(gestureCandidate!==desired){
+      gestureCandidate=desired;
+      gestureCandidateSince=performance.now();
+    }else if(performance.now()-gestureCandidateSince>=140){
+      gestureLane=desired;
+      targetLaneIndex=gestureLane;
+      gestureCandidateSince=0;
+    }
+  }else{
+    gestureCandidate=gestureLane;
+    gestureCandidateSince=0;
+  }
+
+  lastRunningPose=true;
 }
 
 async function startPose(){
@@ -1082,7 +1125,7 @@ document.getElementById('startBtn').onclick=async()=>{
   running=true;
   timeLeft=GAME_DURATION;
   score=0;gifts=0;avoids=0;lights=0;hits=0;
-  worldZ=0; speed=0; targetSpeed=0; laneIndex=1; targetLaneIndex=1; car.position.x=trackCenter(8.5); scene.position.z=0;
+  worldZ=0; speed=0; targetSpeed=0; laneIndex=1; targetLaneIndex=1; gestureLane=1; gestureCandidate=1; gestureCandidateSince=0; leanFiltered=0; car.position.x=trackCenter(8.5); scene.position.z=0;
   clock.start();
   await startPose();
 };
