@@ -126,6 +126,11 @@ button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:2
   #itemBadge{top:110px;left:12px}
 }
 
+
+/* Clean gameplay screen: no instructional text overlays */
+#mission,#status{display:none !important;}
+#start .controls{display:none !important;}
+
 </style>
 </head>
 <body>
@@ -160,12 +165,7 @@ button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:2
   <div class="panel">
     <h1>MOTION KART 3D • GRAND PRIX</h1>
     <div class="tagline">3D Kart Racing • Body Motion Control • 60 Seconds</div>
-    <div class="controls">
-      <div class="tip"><b>START / RUN</b> Chạm 2 tay trên đầu để xe chạy.</div>
-      <div class="tip"><b>TURN</b> Nghiêng trái = Làn 1 • Thẳng = Làn 2 • Nghiêng phải = Làn 3.</div>
-      <div class="tip"><b>RED LIGHT</b> Đèn đỏ chỉ 1,5 giây rồi tự chuyển xanh.</div>
-      <div class="tip"><b>GOAL</b> Né vật cản • lấy Item Box • hoàn thành thử thách trong 60 giây.</div>
-    </div>
+    <div class="controls" style="display:none"></div>
     <button id="startBtn">START RACE</button>
   </div>
 </div>
@@ -220,20 +220,20 @@ let laneIndex=1,targetLaneIndex=1,laneCooldown=0,lastLeanDir=0;
 // ===== GAME AUDIO SYSTEM =====
 let audioCtx=null, engineOsc=null, engineGain=null;
 let bgGain=null;
+let musicTimer=null, musicStep=0, musicGain=null, musicStarted=false;
+
 function initAudio(){
-  if(audioCtx) return;
+  if(audioCtx){
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    startDramaticMusic();
+    return;
+  }
+
   audioCtx=new (window.AudioContext||window.webkitAudioContext)();
 
-  bgGain=audioCtx.createGain();
-  bgGain.gain.value=.035;
-  bgGain.connect(audioCtx.destination);
-
-  // arcade background tone
-  const bg=audioCtx.createOscillator();
-  bg.type='triangle';
-  bg.frequency.value=220;
-  bg.connect(bgGain);
-  bg.start();
+  musicGain=audioCtx.createGain();
+  musicGain.gain.value=.065;
+  musicGain.connect(audioCtx.destination);
 
   engineOsc=audioCtx.createOscillator();
   engineOsc.type='sawtooth';
@@ -243,6 +243,77 @@ function initAudio(){
   engineOsc.connect(engineGain);
   engineGain.connect(audioCtx.destination);
   engineOsc.start();
+
+  startDramaticMusic();
+}
+
+function playMusicNote(freq,duration=.22,type='sawtooth',gain=.055){
+  if(!audioCtx || !musicGain) return;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type=type;
+  o.frequency.setValueAtTime(freq,audioCtx.currentTime);
+  g.gain.setValueAtTime(.0001,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(gain,audioCtx.currentTime+.018);
+  g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+duration);
+  o.connect(g);g.connect(musicGain);
+  o.start();
+  o.stop(audioCtx.currentTime+duration+.03);
+}
+
+function playMusicKick(){
+  if(!audioCtx || !musicGain) return;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type='sine';
+  o.frequency.setValueAtTime(115,audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(48,audioCtx.currentTime+.16);
+  g.gain.setValueAtTime(.09,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.18);
+  o.connect(g);g.connect(musicGain);
+  o.start();o.stop(audioCtx.currentTime+.2);
+}
+
+function playMusicTick(){
+  if(!audioCtx || !musicGain) return;
+  const scale=[110,130.81,146.83,164.81,196,220,246.94,293.66];
+  const bass=[55,65.41,73.42,82.41];
+  const i=musicStep%16;
+
+  // Driving arpeggio + low bass pulse.
+  playMusicNote(scale[(i*2)%scale.length],.20,'square',.035);
+  playMusicNote(scale[(i*2+3)%scale.length]*2,.13,'triangle',.028);
+
+  if(i%4===0) playMusicNote(bass[(i/4)%bass.length],.38,'sawtooth',.055);
+  if(i%4===0) playMusicKick();
+
+  // Short high note every 8 steps for tension.
+  if(i===7 || i===15){
+    playMusicNote(440,.18,'triangle',.05);
+    playMusicNote(659.25,.12,'triangle',.035);
+  }
+
+  musicStep++;
+}
+
+function startDramaticMusic(){
+  if(musicStarted || !audioCtx) return;
+  musicStarted=true;
+  musicStep=0;
+  playMusicTick();
+  musicTimer=setInterval(playMusicTick,250);
+}
+
+function stopDramaticMusic(){
+  if(musicTimer){
+    clearInterval(musicTimer);
+    musicTimer=null;
+  }
+  musicStarted=false;
+  if(musicGain && audioCtx){
+    musicGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    musicGain.gain.setTargetAtTime(.0001,audioCtx.currentTime,.12);
+  }
 }
 
 function sound(type){
@@ -769,14 +840,21 @@ function trafficLight(z){
   beam.position.set(0,7.1,-.2); group.add(beam);
   const panel=new THREE.Mesh(new THREE.BoxGeometry(5.8,1.35,.4),new THREE.MeshStandardMaterial({color:0xd62929,emissive:0x360000,emissiveIntensity:.55}));
   panel.position.set(0,6.1,-.58); group.add(panel);
-  const signalHousing=new THREE.Mesh(new THREE.BoxGeometry(1.1,3.1,.9),new THREE.MeshStandardMaterial({color:0x151b23,metalness:.45,roughness:.5}));
-  signalHousing.position.set(0,5,-.42); group.add(signalHousing);
+  const lampBackMat=new THREE.MeshBasicMaterial({color:0x59636e});
+  const lampGlowMat=new THREE.MeshBasicMaterial({color:0x26313d});
+  const redBack=new THREE.Mesh(new THREE.CircleGeometry(.36,20),lampBackMat);
+  redBack.position.set(0,5.78,-.86); group.add(redBack);
+  const yellowBack=new THREE.Mesh(new THREE.CircleGeometry(.36,20),lampBackMat);
+  yellowBack.position.set(0,5,-.86); group.add(yellowBack);
+  const greenBack=new THREE.Mesh(new THREE.CircleGeometry(.36,20),lampBackMat);
+  greenBack.position.set(0,4.22,-.86); group.add(greenBack);
+
   const red=new THREE.Mesh(new THREE.SphereGeometry(.27,16,10),new THREE.MeshBasicMaterial({color:0xff3b30}));
-  red.position.set(0,5.78,-.9); group.add(red);
+  red.position.set(0,5.78,-.92); group.add(red);
   const yellow=new THREE.Mesh(new THREE.SphereGeometry(.27,16,10),new THREE.MeshBasicMaterial({color:0x6c5a20}));
-  yellow.position.set(0,5,-.9); group.add(yellow);
+  yellow.position.set(0,5,-.92); group.add(yellow);
   const green=new THREE.Mesh(new THREE.SphereGeometry(.27,16,10),new THREE.MeshBasicMaterial({color:0x164b32}));
-  green.position.set(0,4.22,-.9); group.add(green);
+  green.position.set(0,4.22,-.92); group.add(green);
   group.userData={red,yellow,green,panel};
   group.position.set(trackCenter(z),0,z);
   group.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
@@ -959,6 +1037,7 @@ function loop(now=performance.now()){
 
 function endGame(){
   running=false; targetSpeed=0; speed=0;
+  stopDramaticMusic();
   ui.finalScore.textContent=Math.max(0,Math.round(score));
   ui.giftCount.textContent=gifts;
   ui.avoidCount.textContent=avoids;
@@ -1144,12 +1223,12 @@ async function startPose(){
     };
 
     requestAnimationFrame(processFrame);
-    toast('CAMERA READY — GIƠ 2 TAY LÊN ĐẦU','good');
+    sound('ok');
 
   }catch(err){
     console.error('Camera error:',err);
     ui.gesture.textContent='CAMERA';
-    toast('KHÔNG MỞ ĐƯỢC CAMERA','bad');
+    sound('crash');
   }
 }
 
