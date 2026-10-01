@@ -29,23 +29,32 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;font-family:Arial,Helv
 #mission{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:25;min-width:min(820px,84vw);padding:13px 18px;text-align:center;font-weight:900;font-size:18px;background:linear-gradient(180deg,#ffe05c,#ff8e00);color:#271500;border:4px solid #fff;border-radius:999px;box-shadow:var(--shadow)}
 #toast{
   position:fixed;
-  right:18px;
-  top:196px;
-  left:auto;
+  left:18px;
+  right:auto;
+  top:278px;
   transform:none;
-  z-index:40;
-  min-width:170px;
-  max-width:245px;
-  padding:10px 16px;
-  border-radius:999px;
-  background:rgba(10,19,55,.96);
-  border:2px solid rgba(255,255,255,.82);
+  z-index:60;
+  min-width:185px;
+  max-width:255px;
+  padding:11px 17px;
+  border-radius:16px;
+  background:linear-gradient(180deg,#ffe85c,#ff7800);
+  color:#271400;
+  border:4px solid #fff;
   font-weight:900;
   text-align:center;
   opacity:0;
-  transition:.18s;
+  transition:opacity .16s,transform .16s;
+  transform-origin:left center;
   pointer-events:none;
-  box-shadow:0 8px 24px rgba(0,0,0,.28);
+  box-shadow:0 9px 26px rgba(0,0,0,.35);
+}
+#toast.show{
+  opacity:1;
+  transform:translateY(0) scale(1);
+}
+#toast:not(.show){
+  transform:translateY(-6px) scale(.96);
 }
 #toast.show{opacity:1}
 #timebar{position:fixed;left:18px;right:270px;bottom:16px;height:10px;background:rgba(255,255,255,.18);z-index:20;border-radius:999px;overflow:hidden;border:2px solid rgba(255,255,255,.6)}
@@ -137,7 +146,7 @@ button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:2
 #itemBadge img{width:64px;height:64px;object-fit:contain}
 #boostFlash{position:fixed;inset:0;z-index:7;pointer-events:none;opacity:0;background:radial-gradient(circle,rgba(255,242,120,.35),transparent 45%);transition:opacity .1s}
 @media(max-width:900px){
-  #toast{right:12px;top:164px;max-width:210px;min-width:145px;padding:8px 12px;font-size:13px}
+  #toast{left:12px;right:auto;top:194px;max-width:215px;min-width:145px;padding:8px 12px;font-size:13px}
   #hud{left:12px;right:12px;transform:none;justify-content:flex-start}
   #hud .metric{min-width:88px}
   #cameraWrap{width:175px;height:132px}
@@ -164,6 +173,11 @@ button{margin-top:26px;border:0;border-radius:18px;padding:15px 34px;font-size:2
 #rhythmLanes span.hit{animation:laneBeat .22s ease-out}
 @keyframes laneBeat{0%{transform:scale(1.18)}55%{transform:scale(1.42)}100%{transform:scale(1.18)}}
 @media(max-width:900px){#beatPulse{top:74px;width:50px;height:50px}#rhythmLanes{bottom:16px;gap:9px}#rhythmLanes span{width:34px;height:34px;font-size:17px}}
+
+
+#toast.good{box-shadow:0 0 0 3px rgba(126,255,190,.35),0 9px 26px rgba(0,0,0,.35)}
+#toast.bad{box-shadow:0 0 0 3px rgba(255,90,90,.35),0 9px 26px rgba(0,0,0,.35)}
+#toast.gold{box-shadow:0 0 0 3px rgba(255,226,70,.42),0 9px 26px rgba(0,0,0,.35)}
 
 </style>
 </head>
@@ -1141,21 +1155,24 @@ function detectGesture(lm){
   const shoulderY=(ls.y+rs.y)/2;
   const torsoLen=Math.max(.12,Math.hypot(shoulderX-hipX,shoulderY-hipY));
 
-  const rawLean=(shoulderX-hipX)/torsoLen;
+  const torsoLean=(shoulderX-hipX)/torsoLen;
+  const headLean=(nose.x-hipX)/torsoLen;
+  const rawLean=torsoLean*.72 + headLean*.28;
 
-  // Auto-zero small natural camera/body bias while the student is near center.
-  if(leanBaselineSamples<25 && Math.abs(rawLean)<.16){
-    leanBaseline += (rawLean-leanBaseline)*.25;
+  // Auto-zero only while the player is clearly near the middle.
+  if(leanBaselineSamples<30 && Math.abs(rawLean)<.13){
+    leanBaseline += (rawLean-leanBaseline)*.28;
     leanBaselineSamples++;
-  }else if(Math.abs(rawLean-leanBaseline)<.10 && gestureLane===1){
-    leanBaseline += (rawLean-leanBaseline)*.025;
+  }else if(Math.abs(rawLean-leanBaseline)<.07 && gestureLane===1){
+    leanBaseline += (rawLean-leanBaseline)*.018;
   }
 
   const centeredLean=rawLean-leanBaseline;
   leanFiltered=leanFiltered*.68 + centeredLean*.32;
 
-  // Camera is mirrored for the student, so invert the landmark direction.
-  const steer=clamp(-leanFiltered,-1,1);
+  // MediaPipe receives the camera frame in its native coordinate system.
+  // Do NOT invert it here: physical LEFT must map to lane 1.
+  const steer=clamp(leanFiltered,-1,1);
   ui.leanDot.style.left=(50+steer*45)+'%';
 
   if(!runStable) return;
