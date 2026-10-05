@@ -1,372 +1,505 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>MÔ HÌNH HUẤN LUYỆN AI</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>AI học vật dẫn điện – vật cách điện</title>
+
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier@1.2.6/dist/knn-classifier.min.js"></script>
+
   <style>
+    :root{
+      --bg:#f8fafc; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
+      --line:#e2e8f0; --blue:#2563eb; --blue2:#1d4ed8;
+      --green:#16a34a; --green2:#15803d; --orange:#f59e0b;
+      --red:#dc2626; --shadow:0 10px 30px rgba(15,23,42,.08);
+    }
     *{box-sizing:border-box}
     body{
-      margin:0;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-      background:#f4f6fb;
-      color:#1f2937;
+      margin:0; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:var(--bg); color:var(--ink);
     }
-    .wrap{max-width:1000px;margin:0 auto;padding:18px}
-    h1{
-      text-align:center;
-      margin:8px 0 18px;
-      font-size:clamp(28px,4vw,44px);
+    .wrap{max-width:1080px; margin:0 auto; padding:20px}
+    .hero{text-align:center; margin:4px 0 18px}
+    .hero h1{font-size:clamp(26px,4vw,44px); margin:0 0 8px; line-height:1.1}
+    .hero p{font-size:clamp(16px,2vw,20px); color:var(--muted); margin:0}
+    .grid{display:grid; grid-template-columns:1.15fr .85fr; gap:18px; align-items:start}
+    .card{background:var(--card); border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow)}
+    .camera-card{padding:14px}
+    .video-shell{
+      position:relative; overflow:hidden; border-radius:18px; background:#111827;
+      aspect-ratio:4/3; display:grid; place-items:center;
     }
-    .panel{
-      background:#fff;
-      border-radius:18px;
-      padding:18px;
-      margin-bottom:18px;
-      box-shadow:0 8px 24px rgba(0,0,0,.07);
+    video{width:100%; height:100%; object-fit:cover; display:block}
+    .camera-msg{
+      position:absolute; inset:auto 12px 12px 12px; padding:10px 12px; border-radius:12px;
+      color:white; background:rgba(15,23,42,.72); font-size:15px; text-align:center;
+      backdrop-filter:blur(8px);
     }
-    h2{margin-top:0}
-    .principles{
-      display:grid;
-      grid-template-columns:repeat(2,1fr);
-      gap:12px;
+    .top-actions{display:flex; gap:10px; margin-top:12px; flex-wrap:wrap}
+    button{
+      appearance:none; border:0; border-radius:16px; padding:14px 18px; min-height:52px;
+      font-size:17px; font-weight:800; cursor:pointer; transition:.15s ease;
     }
-    @media(max-width:700px){
-      .principles,.groups,.actions{grid-template-columns:1fr!important}
+    button:active{transform:scale(.985)}
+    button:disabled{opacity:.45; cursor:not-allowed; transform:none}
+    .secondary{background:#e2e8f0; color:#0f172a}
+    .primary{background:var(--blue); color:white}
+    .primary:hover:not(:disabled){background:var(--blue2)}
+    .green{background:var(--green); color:white}
+    .green:hover:not(:disabled){background:var(--green2)}
+    .train-panel{padding:18px}
+    .steps{display:flex; gap:8px; margin-bottom:16px}
+    .step{
+      flex:1; text-align:center; padding:9px 6px; border-radius:12px; background:#f1f5f9;
+      font-weight:800; color:#475569; font-size:14px;
     }
-    .principle{
-      background:#f9fafb;
-      border-radius:14px;
-      padding:14px;
-      font-size:18px;
-      line-height:1.5;
+    .step.active{background:#dbeafe; color:#1d4ed8}
+    .class-box{
+      border:2px solid var(--line); border-radius:20px; padding:16px; margin-bottom:12px;
     }
-    .groups{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:16px;
-    }
-    .group{
-      border:2px solid #e5e7eb;
-      border-radius:16px;
-      padding:16px;
-    }
-    .group h3{
-      margin-top:0;
-      font-size:20px;
-      line-height:1.35;
-    }
-    .actions{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:10px;
-      margin-top:12px;
-    }
-    button,.fileLabel{
-      border:0;
-      border-radius:14px;
-      padding:14px 16px;
-      font-size:17px;
-      font-weight:800;
-      cursor:pointer;
-      text-align:center;
-      display:block;
-      width:100%;
-    }
-    .green{background:#16a34a;color:#fff}
-    .orange{background:#f59e0b;color:#111827}
-    .blue{background:#2563eb;color:#fff}
-    .dark{background:#111827;color:#fff}
-    .light{background:#e5e7eb;color:#111827}
-    input[type=file]{display:none}
+    .class-title{display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:12px}
+    .class-title strong{font-size:21px}
     .count{
-      text-align:center;
-      margin-top:10px;
-      font-weight:700;
+      min-width:54px; height:38px; padding:0 10px; border-radius:999px; display:grid; place-items:center;
+      font-weight:900; background:#f1f5f9;
     }
-    .thumbs{
-      display:grid;
-      grid-template-columns:repeat(4,1fr);
-      gap:8px;
-      margin-top:12px;
-    }
-    .thumbs img{
-      width:100%;
-      aspect-ratio:1/1;
-      object-fit:cover;
-      border-radius:10px;
-      border:1px solid #e5e7eb;
-    }
-    .camera-box{
-      background:#111827;
-      aspect-ratio:4/3;
-      border-radius:16px;
-      overflow:hidden;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-    video{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-    }
+    .capture{width:100%; background:#0f172a; color:white}
+    .capture.good{background:var(--green)}
+    .capture.insulator{background:#7c3aed}
+    .meter{height:10px; background:#e2e8f0; border-radius:999px; overflow:hidden; margin-top:10px}
+    .meter > span{display:block; height:100%; width:0%; background:var(--green); transition:width .2s}
+    .train-btn{width:100%; margin-top:4px; font-size:20px; background:var(--blue); color:white}
     .status{
-      text-align:center;
-      margin-top:10px;
-      font-weight:700;
-      min-height:24px;
+      margin-top:12px; min-height:54px; border-radius:16px; padding:12px 14px; background:#f8fafc;
+      border:1px solid var(--line); display:flex; align-items:center; gap:10px; font-weight:700;
     }
+    .dot{width:11px; height:11px; border-radius:50%; background:var(--orange); flex:none}
+    .test-card{margin-top:18px; padding:18px; display:none}
+    .test-card.show{display:block}
+    .test-head{display:flex; gap:12px; justify-content:space-between; align-items:center; flex-wrap:wrap}
+    .test-head h2{margin:0; font-size:26px}
     .result{
-      margin-top:14px;
-      background:#eef2ff;
-      border-radius:16px;
-      padding:18px;
-      text-align:center;
+      margin-top:14px; border-radius:22px; padding:20px; text-align:center;
+      background:#f1f5f9; border:2px dashed #cbd5e1;
     }
-    .result .label{
-      font-size:clamp(28px,5vw,46px);
-      font-weight:900;
+    .result .label{font-size:clamp(28px,5vw,46px); font-weight:950; line-height:1.05}
+    .result .confidence{font-size:21px; color:var(--muted); margin-top:8px; font-weight:750}
+    .bars{display:grid; gap:8px; margin-top:16px}
+    .barrow{display:grid; grid-template-columns:130px 1fr 58px; gap:10px; align-items:center; font-weight:800}
+    .bar{height:14px; border-radius:999px; overflow:hidden; background:#e2e8f0}
+    .bar span{display:block; height:100%; width:0%; transition:width .2s}
+    #barConductor{background:var(--green)}
+    #barInsulator{background:#7c3aed}
+    .teacher-note{
+      margin-top:18px; padding:14px 16px; border-radius:16px; background:#fff7ed;
+      border:1px solid #fed7aa; color:#9a3412; font-weight:700; line-height:1.45;
     }
-    .result .confidence{
-      margin-top:8px;
-      font-size:18px;
+    .footer-actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
+    .danger{background:#fee2e2; color:#991b1b}
+    .pulse{animation:pulse .65s ease}
+    @keyframes pulse{50%{transform:scale(1.02)}}
+    @media (max-width:820px){
+      .grid{grid-template-columns:1fr}
+      .wrap{padding:12px}
+      .card{border-radius:20px}
+      .barrow{grid-template-columns:105px 1fr 48px; font-size:14px}
     }
-    .hidden{display:none!important}
   </style>
 </head>
+
 <body>
-<div class="wrap">
-  <h1>MÔ HÌNH HUẤN LUYỆN AI</h1>
+  <main class="wrap">
+    <section class="hero">
+      <h1>🤖 HUẤN LUYỆN AI</h1>
+      <p>Dạy AI nhận biết <b>Vật dẫn điện</b> và <b>Vật cách điện</b></p>
+    </section>
 
-  <div class="panel">
-    <h2>NGUYÊN TẮC HUẤN LUYỆN</h2>
-    <div class="principles">
-      <div class="principle">✅ <b>Đúng:</b> Ảnh phải được xếp đúng nhóm.</div>
-      <div class="principle">✅ <b>Đủ:</b> Mỗi nhóm cần có nhiều hình ảnh.</div>
-      <div class="principle">✅ <b>Đa dạng:</b> Chụp ở nhiều góc, khoảng cách và nền khác nhau.</div>
-      <div class="principle">✅ <b>Cân bằng:</b> Hai nhóm nên có số lượng ảnh gần tương đương.</div>
-    </div>
-  </div>
-
-  <div class="panel">
-    <h2>1. HUẤN LUYỆN AI</h2>
-    <div class="groups">
-      <div class="group">
-        <h3>NHÓM 1: CHỌN MẪU VẬT DẪN ĐIỆN</h3>
-        <div class="actions">
-          <button class="green" onclick="openCapture('0')">📷 Chụp ảnh</button>
-          <label class="fileLabel light">
-            🖼️ Gửi ảnh từ bộ sưu tập
-            <input id="upload0" type="file" accept="image/*" multiple>
-          </label>
+    <section class="grid">
+      <div class="card camera-card">
+        <div class="video-shell">
+          <video id="video" autoplay playsinline muted></video>
+          <div class="camera-msg" id="cameraMsg">Bấm “Mở camera” để bắt đầu</div>
         </div>
-        <div class="count">Số mẫu: <span id="count0">0</span></div>
-        <div id="thumb0" class="thumbs"></div>
-      </div>
-
-      <div class="group">
-        <h3>NHÓM 2: CHỌN MẪU VẬT CÁCH ĐIỆN</h3>
-        <div class="actions">
-          <button class="orange" onclick="openCapture('1')">📷 Chụp ảnh</button>
-          <label class="fileLabel light">
-            🖼️ Gửi ảnh từ bộ sưu tập
-            <input id="upload1" type="file" accept="image/*" multiple>
-          </label>
+        <div class="top-actions">
+          <button class="primary" id="startCamera">📷 MỞ CAMERA</button>
+          <button class="secondary" id="switchCamera" disabled>🔄 ĐỔI CAMERA</button>
         </div>
-        <div class="count">Số mẫu: <span id="count1">0</span></div>
-        <div id="thumb1" class="thumbs"></div>
       </div>
-    </div>
-  </div>
 
-  <div id="capturePanel" class="panel hidden">
-    <h2 id="captureTitle">CHỤP MẪU</h2>
-    <div class="camera-box">
-      <video id="captureVideo" autoplay playsinline muted></video>
-    </div>
-    <div class="actions">
-      <button id="captureShotBtn" class="blue">📸 Chụp mẫu này</button>
-      <button class="light" onclick="closeCapture()">Đóng</button>
-    </div>
-    <div id="captureStatus" class="status"></div>
-  </div>
+      <div class="card train-panel">
+        <div class="steps">
+          <div class="step active" id="step1">1. Chụp mẫu</div>
+          <div class="step" id="step2">2. Huấn luyện</div>
+          <div class="step" id="step3">3. Kiểm tra</div>
+        </div>
 
-  <div class="panel">
-    <h2>2. THỬ THÁCH AI</h2>
-    <button id="startTestCam" class="blue">📷 Bật camera thử thách</button>
-    <div id="testArea" class="hidden" style="margin-top:12px;">
-      <div class="camera-box">
-        <video id="testVideo" autoplay playsinline muted></video>
+        <div class="class-box">
+          <div class="class-title">
+            <strong>⚡ VẬT DẪN ĐIỆN</strong>
+            <span class="count"><span id="countConductor">0</span>/20</span>
+          </div>
+          <button class="capture good" id="captureConductor" disabled>CHỤP MẪU DẪN ĐIỆN</button>
+          <div class="meter"><span id="meterConductor"></span></div>
+        </div>
+
+        <div class="class-box">
+          <div class="class-title">
+            <strong>🧤 VẬT CÁCH ĐIỆN</strong>
+            <span class="count"><span id="countInsulator">0</span>/20</span>
+          </div>
+          <button class="capture insulator" id="captureInsulator" disabled>CHỤP MẪU CÁCH ĐIỆN</button>
+          <div class="meter"><span id="meterInsulator"></span></div>
+        </div>
+
+        <button class="train-btn" id="trainBtn" disabled>🧠 HUẤN LUYỆN AI</button>
+
+        <div class="status" id="status" aria-live="polite">
+          <span class="dot" id="statusDot"></span>
+          <span id="statusText">Đang chuẩn bị mô hình AI...</span>
+        </div>
+
+        <div class="footer-actions">
+          <button class="danger" id="resetBtn">↻ HỌC LẠI TỪ ĐẦU</button>
+        </div>
       </div>
-      <div class="actions">
-        <button id="testShotBtn" class="dark">📸 Chụp và hỏi AI</button>
-        <button id="switchCamBtn" class="light">🔄 Đổi camera</button>
+    </section>
+
+    <section class="card test-card" id="testCard">
+      <div class="test-head">
+        <h2>🔍 AI KIỂM TRA VẬT MỚI</h2>
+        <button class="green" id="togglePredict">▶ BẮT ĐẦU KIỂM TRA</button>
       </div>
-      <div id="result" class="result">
-        <div class="label">Chưa có kết quả</div>
-        <div class="confidence">Hãy chụp một vật để AI phản hồi.</div>
+
+      <div class="result" id="resultBox">
+        <div class="label" id="resultLabel">Đưa một vật trước camera</div>
+        <div class="confidence" id="resultConfidence">AI sẽ đưa ra dự đoán</div>
       </div>
-    </div>
-  </div>
-</div>
 
-<canvas id="canvas" class="hidden"></canvas>
+      <div class="bars">
+        <div class="barrow">
+          <span>Dẫn điện</span>
+          <div class="bar"><span id="barConductor"></span></div>
+          <span id="pctConductor">0%</span>
+        </div>
+        <div class="barrow">
+          <span>Cách điện</span>
+          <div class="bar"><span id="barInsulator"></span></div>
+          <span id="pctInsulator">0%</span>
+        </div>
+      </div>
 
-<script>
-let net;
-let classifier = knnClassifier.create();
-let currentTrainLabel = null;
-let captureStream = null;
-let testStream = null;
-let testFacingMode = "environment";
+      <div class="teacher-note">
+        💡 <b>Lưu ý:</b> AI chỉ dự đoán dựa trên hình ảnh đã được học. Muốn biết chắc vật có dẫn điện hay không, hãy kiểm chứng bằng thí nghiệm mạch điện.
+      </div>
+    </section>
+  </main>
 
-const captureVideo = document.getElementById("captureVideo");
-const testVideo = document.getElementById("testVideo");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+  <script>
+    const MIN_SAMPLES = 10;
+    const TARGET_SAMPLES = 20;
+    const BURST = 5;
 
-async function initAI(){
-  net = await mobilenet.load();
-}
-initAI();
+    const video = document.getElementById('video');
+    const cameraMsg = document.getElementById('cameraMsg');
+    const startCameraBtn = document.getElementById('startCamera');
+    const switchCameraBtn = document.getElementById('switchCamera');
+    const captureConductorBtn = document.getElementById('captureConductor');
+    const captureInsulatorBtn = document.getElementById('captureInsulator');
+    const trainBtn = document.getElementById('trainBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const togglePredictBtn = document.getElementById('togglePredict');
 
-function updateCounts(){
-  const c = classifier.getClassExampleCount();
-  document.getElementById("count0").textContent = c["0"] || 0;
-  document.getElementById("count1").textContent = c["1"] || 0;
-}
+    const countConductor = document.getElementById('countConductor');
+    const countInsulator = document.getElementById('countInsulator');
+    const meterConductor = document.getElementById('meterConductor');
+    const meterInsulator = document.getElementById('meterInsulator');
 
-async function startStream(videoEl, facingMode){
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video:{facingMode},
-    audio:false
-  });
-  videoEl.srcObject = stream;
-  await videoEl.play();
-  return stream;
-}
+    const statusText = document.getElementById('statusText');
+    const statusDot = document.getElementById('statusDot');
 
-async function openCapture(label){
-  currentTrainLabel = label;
-  document.getElementById("captureTitle").textContent =
-    label === "0" ? "CHỤP MẪU VẬT DẪN ĐIỆN" : "CHỤP MẪU VẬT CÁCH ĐIỆN";
-  document.getElementById("capturePanel").classList.remove("hidden");
-  document.getElementById("captureStatus").textContent = "";
-  if(captureStream) captureStream.getTracks().forEach(t=>t.stop());
-  try{
-    captureStream = await startStream(captureVideo,"environment");
-  }catch(e){
-    document.getElementById("captureStatus").textContent = "Không mở được camera.";
-  }
-}
+    const testCard = document.getElementById('testCard');
+    const resultBox = document.getElementById('resultBox');
+    const resultLabel = document.getElementById('resultLabel');
+    const resultConfidence = document.getElementById('resultConfidence');
+    const barConductor = document.getElementById('barConductor');
+    const barInsulator = document.getElementById('barInsulator');
+    const pctConductor = document.getElementById('pctConductor');
+    const pctInsulator = document.getElementById('pctInsulator');
 
-function closeCapture(){
-  if(captureStream){
-    captureStream.getTracks().forEach(t=>t.stop());
-    captureStream = null;
-  }
-  document.getElementById("capturePanel").classList.add("hidden");
-}
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const step3 = document.getElementById('step3');
 
-function captureFrame(videoEl){
-  canvas.width = videoEl.videoWidth;
-  canvas.height = videoEl.videoHeight;
-  ctx.drawImage(videoEl,0,0,canvas.width,canvas.height);
-  return canvas;
-}
+    let net = null;
+    let classifier = knnClassifier.create();
+    let stream = null;
+    let facingMode = 'environment';
+    let cameraReady = false;
+    let modelReady = false;
+    let trained = false;
+    let predicting = false;
+    let predictLoopId = 0;
 
-async function addImageElementToClassifier(imgEl,label){
-  if(!net) return;
-  const tensor = tf.browser.fromPixels(imgEl);
-  const activation = net.infer(tensor,true);
-  classifier.addExample(activation,label);
-  tensor.dispose();
-  activation.dispose();
-  updateCounts();
-}
+    function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
-function addThumbnail(dataUrl,label){
-  const img = document.createElement("img");
-  img.src = dataUrl;
-  document.getElementById(label === "0" ? "thumb0" : "thumb1").appendChild(img);
-}
+    function setStatus(text, color='#f59e0b'){
+      statusText.textContent = text;
+      statusDot.style.background = color;
+    }
 
-document.getElementById("captureShotBtn").addEventListener("click", async ()=>{
-  if(!captureVideo.videoWidth) return;
-  const frame = captureFrame(captureVideo);
-  const dataUrl = frame.toDataURL("image/jpeg",0.9);
-  const img = new Image();
-  img.onload = async ()=>{
-    await addImageElementToClassifier(img,currentTrainLabel);
-    addThumbnail(dataUrl,currentTrainLabel);
-    document.getElementById("captureStatus").textContent = "Đã thêm mẫu vào nhóm.";
-  };
-  img.src = dataUrl;
-});
+    function setStep(n){
+      [step1,step2,step3].forEach((el,i)=>el.classList.toggle('active', i === n-1));
+    }
 
-async function handleUpload(files,label){
-  for(const file of files){
-    const dataUrl = await new Promise(resolve=>{
-      const reader = new FileReader();
-      reader.onload = ()=>resolve(reader.result);
-      reader.readAsDataURL(file);
+    function getCounts(){
+      const c = classifier.getClassExampleCount();
+      return {
+        conductor: c.conductor || 0,
+        insulator: c.insulator || 0
+      };
+    }
+
+    function refreshCounts(){
+      const c = getCounts();
+      countConductor.textContent = Math.min(c.conductor, TARGET_SAMPLES);
+      countInsulator.textContent = Math.min(c.insulator, TARGET_SAMPLES);
+      meterConductor.style.width = Math.min(100, c.conductor / TARGET_SAMPLES * 100) + '%';
+      meterInsulator.style.width = Math.min(100, c.insulator / TARGET_SAMPLES * 100) + '%';
+
+      trainBtn.disabled = !(modelReady && cameraReady &&
+        c.conductor >= MIN_SAMPLES && c.insulator >= MIN_SAMPLES);
+
+      if (!trained && c.conductor >= MIN_SAMPLES && c.insulator >= MIN_SAMPLES){
+        setStatus('Đã đủ dữ liệu. Bấm “HUẤN LUYỆN AI”.', '#16a34a');
+        setStep(2);
+      }
+    }
+
+    async function loadAI(){
+      try{
+        await tf.ready();
+        setStatus('Đang tải bộ não AI...', '#f59e0b');
+        net = await mobilenet.load({version: 2, alpha: 0.50});
+        modelReady = true;
+        setStatus('AI đã sẵn sàng. Hãy mở camera.', '#16a34a');
+        enableCaptureIfReady();
+      }catch(err){
+        console.error(err);
+        setStatus('Không tải được mô hình AI. Hãy kiểm tra Internet rồi tải lại trang.', '#dc2626');
+      }
+    }
+
+    async function startCamera(){
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        setStatus('Trình duyệt này không hỗ trợ camera.', '#dc2626');
+        return;
+      }
+      try{
+        if (stream) stream.getTracks().forEach(t => t.stop());
+
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        await video.play();
+        cameraReady = true;
+        cameraMsg.textContent = 'Đưa vật vào giữa khung hình';
+        startCameraBtn.textContent = '✅ CAMERA ĐÃ MỞ';
+        switchCameraBtn.disabled = false;
+        enableCaptureIfReady();
+        setStatus(modelReady ? 'Sẵn sàng chụp mẫu.' : 'Camera đã mở. Đang chờ mô hình AI...', '#16a34a');
+      }catch(err){
+        console.error(err);
+        cameraReady = false;
+        cameraMsg.textContent = 'Không mở được camera';
+        setStatus('Không mở được camera. Hãy cấp quyền camera cho trang web.', '#dc2626');
+      }
+    }
+
+    function enableCaptureIfReady(){
+      const ok = modelReady && cameraReady;
+      captureConductorBtn.disabled = !ok;
+      captureInsulatorBtn.disabled = !ok;
+      if(ok && !trained) setStep(1);
+    }
+
+    async function captureBurst(label, button){
+      if (!modelReady || !cameraReady || trained) return;
+
+      button.disabled = true;
+      const original = button.textContent;
+
+      try{
+        for(let i=1;i<=BURST;i++){
+          button.textContent = `ĐANG CHỤP ${i}/${BURST}...`;
+          const activation = net.infer(video, true);
+          classifier.addExample(activation, label);
+          activation.dispose();
+          refreshCounts();
+          await sleep(160);
+        }
+
+        button.textContent = '✓ ĐÃ THÊM 5 MẪU';
+        button.classList.add('pulse');
+        await sleep(450);
+        button.classList.remove('pulse');
+
+        const c = getCounts();
+        if (c.conductor < MIN_SAMPLES || c.insulator < MIN_SAMPLES){
+          setStatus('Tiếp tục chụp để mỗi nhóm có ít nhất 10 mẫu.', '#f59e0b');
+        }
+      }catch(err){
+        console.error(err);
+        setStatus('Có lỗi khi chụp mẫu. Hãy thử lại.', '#dc2626');
+      }finally{
+        button.textContent = original;
+        button.disabled = !(modelReady && cameraReady) || trained;
+      }
+    }
+
+    async function trainAI(){
+      const c = getCounts();
+      if(c.conductor < MIN_SAMPLES || c.insulator < MIN_SAMPLES) return;
+
+      trainBtn.disabled = true;
+      captureConductorBtn.disabled = true;
+      captureInsulatorBtn.disabled = true;
+      setStep(2);
+      setStatus('AI đang học từ các hình ảnh...', '#2563eb');
+      trainBtn.textContent = '🧠 AI ĐANG HỌC...';
+
+      // KNN học ngay khi các ví dụ được thêm vào.
+      // Khoảng dừng ngắn chỉ giúp giao diện thể hiện rõ chuyển bước, không giả lập epoch.
+      await sleep(700);
+
+      trained = true;
+      trainBtn.textContent = '✅ HUẤN LUYỆN XONG';
+      setStatus('Huấn luyện xong! Bây giờ hãy kiểm tra vật mới.', '#16a34a');
+      testCard.classList.add('show');
+      setStep(3);
+      testCard.scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
+    async function predictOnce(){
+      if (!trained || !cameraReady || classifier.getNumClasses() < 2) return;
+
+      const activation = net.infer(video, true);
+      try{
+        const result = await classifier.predictClass(activation, 3);
+        const pc = result.confidences.conductor || 0;
+        const pi = result.confidences.insulator || 0;
+        const best = result.label;
+        const bestConf = Math.max(pc, pi);
+
+        pctConductor.textContent = Math.round(pc*100) + '%';
+        pctInsulator.textContent = Math.round(pi*100) + '%';
+        barConductor.style.width = (pc*100) + '%';
+        barInsulator.style.width = (pi*100) + '%';
+
+        if(bestConf < 0.62){
+          resultLabel.textContent = '🤔 AI CHƯA CHẮC';
+          resultConfidence.textContent = 'Hãy đưa vật gần hơn hoặc bổ sung dữ liệu huấn luyện';
+          resultBox.style.background = '#fff7ed';
+          resultBox.style.borderColor = '#fdba74';
+        }else if(best === 'conductor'){
+          resultLabel.textContent = '⚡ VẬT DẪN ĐIỆN';
+          resultConfidence.textContent = 'Độ tin cậy: ' + Math.round(bestConf*100) + '%';
+          resultBox.style.background = '#f0fdf4';
+          resultBox.style.borderColor = '#86efac';
+        }else{
+          resultLabel.textContent = '🧤 VẬT CÁCH ĐIỆN';
+          resultConfidence.textContent = 'Độ tin cậy: ' + Math.round(bestConf*100) + '%';
+          resultBox.style.background = '#faf5ff';
+          resultBox.style.borderColor = '#d8b4fe';
+        }
+      }catch(err){
+        console.error(err);
+      }finally{
+        activation.dispose();
+      }
+    }
+
+    async function predictionLoop(){
+      if(!predicting) return;
+      await predictOnce();
+      if(predicting){
+        predictLoopId = window.setTimeout(predictionLoop, 300);
+      }
+    }
+
+    function togglePredict(){
+      if(!trained) return;
+      predicting = !predicting;
+
+      if(predicting){
+        togglePredictBtn.textContent = '⏸ DỪNG KIỂM TRA';
+        setStatus('AI đang quan sát vật trước camera...', '#2563eb');
+        predictionLoop();
+      }else{
+        clearTimeout(predictLoopId);
+        togglePredictBtn.textContent = '▶ BẮT ĐẦU KIỂM TRA';
+        setStatus('Đã dừng kiểm tra.', '#64748b');
+      }
+    }
+
+    async function switchCamera(){
+      facingMode = facingMode === 'environment' ? 'user' : 'environment';
+      await startCamera();
+    }
+
+    function resetAll(){
+      predicting = false;
+      clearTimeout(predictLoopId);
+      classifier.clearAllClasses();
+      trained = false;
+
+      captureConductorBtn.disabled = !(modelReady && cameraReady);
+      captureInsulatorBtn.disabled = !(modelReady && cameraReady);
+      trainBtn.disabled = true;
+      trainBtn.textContent = '🧠 HUẤN LUYỆN AI';
+      togglePredictBtn.textContent = '▶ BẮT ĐẦU KIỂM TRA';
+
+      testCard.classList.remove('show');
+      resultLabel.textContent = 'Đưa một vật trước camera';
+      resultConfidence.textContent = 'AI sẽ đưa ra dự đoán';
+      resultBox.style.background = '#f1f5f9';
+      resultBox.style.borderColor = '#cbd5e1';
+      barConductor.style.width = '0%';
+      barInsulator.style.width = '0%';
+      pctConductor.textContent = '0%';
+      pctInsulator.textContent = '0%';
+
+      refreshCounts();
+      setStep(1);
+      setStatus(cameraReady && modelReady ? 'Đã xóa dữ liệu. Hãy chụp mẫu mới.' : 'Đã xóa dữ liệu.', '#f59e0b');
+    }
+
+    startCameraBtn.addEventListener('click', startCamera);
+    switchCameraBtn.addEventListener('click', switchCamera);
+    captureConductorBtn.addEventListener('click', () => captureBurst('conductor', captureConductorBtn));
+    captureInsulatorBtn.addEventListener('click', () => captureBurst('insulator', captureInsulatorBtn));
+    trainBtn.addEventListener('click', trainAI);
+    togglePredictBtn.addEventListener('click', togglePredict);
+    resetBtn.addEventListener('click', resetAll);
+
+    window.addEventListener('beforeunload', () => {
+      predicting = false;
+      clearTimeout(predictLoopId);
+      if(stream) stream.getTracks().forEach(t => t.stop());
+      try { classifier.dispose(); } catch(e){}
     });
-    const img = new Image();
-    await new Promise(resolve=>{
-      img.onload = resolve;
-      img.src = dataUrl;
-    });
-    await addImageElementToClassifier(img,label);
-    addThumbnail(dataUrl,label);
-  }
-}
 
-document.getElementById("upload0").addEventListener("change",e=>handleUpload(e.target.files,"0"));
-document.getElementById("upload1").addEventListener("change",e=>handleUpload(e.target.files,"1"));
-
-document.getElementById("startTestCam").addEventListener("click", async ()=>{
-  document.getElementById("testArea").classList.remove("hidden");
-  if(testStream) testStream.getTracks().forEach(t=>t.stop());
-  try{
-    testStream = await startStream(testVideo,testFacingMode);
-  }catch(e){
-    document.getElementById("result").innerHTML =
-      '<div class="label">Không mở được camera</div><div class="confidence">Hãy kiểm tra quyền truy cập camera.</div>';
-  }
-});
-
-document.getElementById("switchCamBtn").addEventListener("click", async ()=>{
-  testFacingMode = testFacingMode === "environment" ? "user" : "environment";
-  if(testStream) testStream.getTracks().forEach(t=>t.stop());
-  testStream = await startStream(testVideo,testFacingMode);
-});
-
-document.getElementById("testShotBtn").addEventListener("click", async ()=>{
-  const counts = classifier.getClassExampleCount();
-  if(!(counts["0"]>0 && counts["1"]>0)){
-    document.getElementById("result").innerHTML =
-      '<div class="label">Chưa đủ dữ liệu</div><div class="confidence">Hãy huấn luyện đủ cả 2 nhóm trước.</div>';
-    return;
-  }
-  if(!testVideo.videoWidth || !net) return;
-
-  const frame = captureFrame(testVideo);
-  const tensor = tf.browser.fromPixels(frame);
-  const activation = net.infer(tensor,true);
-  const pred = await classifier.predictClass(activation,5);
-  tensor.dispose();
-  activation.dispose();
-
-  const label = pred.label;
-  const confidence = Math.round((pred.confidences[label] || 0)*100);
-  document.getElementById("result").innerHTML =
-    `<div class="label">${label === "0" ? "⚡ VẬT DẪN ĐIỆN" : "🛡️ VẬT CÁCH ĐIỆN"}</div>
-     <div class="confidence">Mức tin cậy của AI: <b>${confidence}%</b></div>`;
-});
-</script>
+    loadAI();
+  </script>
 </body>
 </html>
